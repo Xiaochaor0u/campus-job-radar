@@ -1,0 +1,135 @@
+{
+  "generated_at": "2026-10-17T08:55:12.462091+00:00",
+  "started_at": "2026-10-17T08:55:00.501088+00:00",
+  "source": {
+    "name": "腾讯招聘（join.qq.com）",
+    "origin": "https://join.qq.com",
+    "list_api": "https://join.qq.com/api/v1/position/searchPosition",
+    "detail_api": "https://join.qq.com/api/v1/jobDetails/getJobDetailsByPostId",
+    "project_mapping_ids": [
+      2,
+      104
+    ],
+    "access": "public read-only JSON API，无登录/无验证码"
+  },
+  "database": "D:\\work\\recruitops-agent\\.data\\recruitops.sqlite",
+  "crawler_metrics": {
+    "crawler": "tencent_internship",
+    "read_only": true,
+    "origin": "https://join.qq.com",
+    "project_mapping_ids": [
+      2,
+      104
+    ],
+    "pages_seen": 6,
+    "listed_unique": 255,
+    "advertised_total": 255,
+    "detail_ok": 30,
+    "delisted": 0,
+    "delisted_sample": [],
+    "detail_failed": 0,
+    "detail_without_requirement": 0,
+    "failure_samples": [],
+    "detail_url_samples": [
+      "https://join.qq.com/post_detail.html?postid=1200791473415778304",
+      "https://join.qq.com/post_detail.html?postid=1153452731391100928",
+      "https://join.qq.com/post_detail.html?postid=1200889496565214210",
+      "https://join.qq.com/post_detail.html?postid=1199423750186201088",
+      "https://join.qq.com/post_detail.html?postid=1200889496565214208"
+    ]
+  },
+  "first_run": {
+    "new": 4,
+    "rejected": 26,
+    "crawl_failures": 1,
+    "rejection_reasons": {
+      "direction_out": 26
+    }
+  },
+  "after_first_run": {
+    "rows": 4,
+    "tracks": {
+      "internship": 4
+    },
+    "qualification": {
+      "qualified": 2,
+      "undetermined": 2
+    },
+    "jd_complete_rows": 4,
+    "rows_with_requirement_section": 4,
+    "analysis_status": {
+      "pending": 4
+    }
+  },
+  "second_run": null,
+  "after_second_run": null,
+  "queries": {
+    "internship": {
+      "count": 4,
+      "ids_sample": [
+        "tencent-intern:1210569901664899072",
+        "tencent-intern:1210569902285656064",
+        "tencent-intern:1211674473603010560"
+      ]
+    },
+    "campus": {
+      "count": 0,
+      "ids_sample": []
+    },
+    "all": {
+      "count": 4,
+      "ids_sample": [
+        "tencent-intern:1210569901664899072",
+        "tencent-intern:1210569902285656064",
+        "tencent-intern:1211674473603010560"
+      ]
+    }
+  },
+  "samples": [
+    {
+      "id": "tencent-intern:1210569901664899072",
+      "title": "测试开发",
+      "city": "深圳总部、北京、上海、广州、成都",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "qualified",
+      "jd_chars": 496,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1210569901664899072"
+    },
+    {
+      "id": "tencent-intern:1210569902285656064",
+      "title": "游戏客户端开发",
+      "city": "深圳总部、北京、上海、杭州",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "undetermined",
+      "jd_chars": 499,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1210569902285656064"
+    },
+    {
+      "id": "tencent-intern:1211674473603010560",
+      "title": "移动客户端开发",
+      "city": "深圳总部、北京、上海、广州、成都",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "qualified",
+      "jd_chars": 541,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1211674473603010560"
+    },
+    {
+      "id": "tencent-intern:1199423750186201088",
+      "title": "算法-多模态方向",
+      "city": "深圳总部、北京、上海、广州、成都",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "undetermined",
+      "jd_chars": 387,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1199423750186201088"
+    }
+  ],
+  "limit_applied": 30
+}

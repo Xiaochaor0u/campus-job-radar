@@ -1,0 +1,74 @@
+{
+  "generated_at": "2026-10-17T08:21:43.288569+00:00",
+  "provider": "DeepSeek",
+  "model": "deepseek-flash",
+  "endpoint": "https://api.deepseek.com/anthropic/v1/messages",
+  "transport": "stub",
+  "analyses": 2,
+  "scenarios": [
+    {
+      "scenario": "A",
+      "kind": "recorded_public_tencent",
+      "job_id": "tencent-intern:1200791473415778304",
+      "title": "后台开发",
+      "status": "failed",
+      "match_score": null,
+      "recommendation": "未评估",
+      "summary": "评分格式或证据核验未通过，已自动重试，待重新评分",
+      "evidence_grounded": "0/0",
+      "advantages": [],
+      "gaps": [],
+      "rule_duration": {
+        "status": "unknown",
+        "negotiability": "not_negotiable",
+        "confirmation_required": false
+      },
+      "rule_gaps_present_in_record": true,
+      "model": "deepseek-flash",
+      "tokens": {
+        "in": null,
+        "out": null
+      },
+      "quote_sha256": [],
+      "quote_count": 0,
+      "quotes_redacted": "原文已在运行时校验，此处不保留第三方文本"
+    },
+    {
+      "scenario": "B",
+      "kind": "synthetic_public_style",
+      "job_id": "task010-scenario-b",
+      "title": "Python开发实习生（西安）",
+      "status": "failed",
+      "match_score": null,
+      "recommendation": "未评估",
+      "summary": "评分格式或证据核验未通过，已自动重试，待重新评分",
+      "evidence_grounded": "0/0",
+      "advantages": [],
+      "gaps": [],
+      "rule_duration": {
+        "status": "gap",
+        "negotiability": "unknown",
+        "confirmation_required": true
+      },
+      "rule_gaps_present_in_record": false,
+      "model": "deepseek-flash",
+      "tokens": {
+        "in": null,
+        "out": null
+      },
+      "quote_sha256": [],
+      "quote_count": 0,
+      "quotes_redacted": "原文已在运行时校验，此处不保留第三方文本"
+    }
+  ],
+  "storage": {
+    "stored_rows": 2,
+    "browse_internship_total": 2,
+    "detail_readable": 2,
+    "browse_ids": [
+      "task010-scenario-b",
+      "tencent-intern:1200791473415778304"
+    ]
+  },
+  "database": "C:\\Users\\ZJL\\AppData\\Local\\Temp\\internops-llm-20261017T082142Z.sqlite"
+}

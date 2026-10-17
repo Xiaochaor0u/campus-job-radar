@@ -1,0 +1,59 @@
+﻿# TASK-004 证据：端到端链路与数据库前后对比
+# 生成时间: 2026-10-17 14:51:04 +08:00
+# git HEAD (提交前): c19428b
+# python: Python 3.11.9
+# 数据库: SQLite 内存库（隔离），经生产 Storage/Repository 接口读写
+# crawler: 注入式假 crawler；JD: 合成文本；**不是真实招聘网站验证**
+
+## 1. 测试分类与结果
+### 1a. Pipeline 集成测试（tests/test_internship_pipeline.py，13 项）
+RESULT: total=13 failures=0 errors=0 skipped=0
+### 1b. 全量相关子集（30 文件：单元 + 契约 + Pipeline + 数据库 + API）
+RESULT: total=557 failures=0 errors=0 skipped=0
+
+## 2. 数据库前后对比（同一 storage 连续三次运行）
+## 实习模式：首轮采集
+
+### run 1 (mode=internship)  (rows=6)
+| id | track | seasons | conversion | qualification | availability | analysis_status |
+|---|---|---|---|---|---|---|
+| campus-1 | unknown | None | unknown | - | inactive | - |
+| intern-cohort | internship | ['summer'] | unknown | not_qualified | active | not_qualified |
+| intern-degree | internship | ['summer'] | unknown | not_qualified | active | not_qualified |
+| intern-duration | internship | ['summer'] | unknown | qualified | active | pending |
+| intern-ok | internship | ['summer'] | yes | qualified | active | pending |
+| intern-unknown | internship | ['summer'] | unknown | undetermined | active | pending |
+
+## 实习模式：重复采集（幂等）
+
+### run 2 (mode=internship, same storage)  (rows=6)
+| id | track | seasons | conversion | qualification | availability | analysis_status |
+|---|---|---|---|---|---|---|
+| campus-1 | unknown | None | unknown | - | active | - |
+| intern-cohort | internship | ['summer'] | unknown | not_qualified | active | not_qualified |
+| intern-degree | internship | ['summer'] | unknown | not_qualified | active | not_qualified |
+| intern-duration | internship | ['summer'] | unknown | qualified | active | pending |
+| intern-ok | internship | ['summer'] | yes | qualified | active | pending |
+| intern-unknown | internship | ['summer'] | unknown | undetermined | active | pending |
+
+## 随后用 campus 模式再跑（不得清零实习分类）
+
+### run 3 (mode=campus, same storage)  (rows=6)
+| id | track | seasons | conversion | qualification | availability | analysis_status |
+|---|---|---|---|---|---|---|
+| campus-1 | unknown | None | unknown | - | active | - |
+| intern-cohort | internship | ['summer'] | unknown | not_qualified | active | not_qualified |
+| intern-degree | internship | ['summer'] | unknown | not_qualified | active | not_qualified |
+| intern-duration | internship | ['summer'] | unknown | qualified | active | pending |
+| intern-ok | internship | ['summer'] | yes | qualified | active | pending |
+| intern-unknown | internship | ['summer'] | unknown | undetermined | active | pending |
+
+## 查询路径
+- track=internship -> 5 rows: ['intern-cohort', 'intern-degree', 'intern-duration', 'intern-ok', 'intern-unknown']
+- track=campus     -> 1 rows: ['campus-1']
+- track=all        -> 6 rows: ['campus-1', 'intern-cohort', 'intern-degree', 'intern-duration', 'intern-ok', 'intern-unknown']
+
+## 3. 编译与迁移静态检查
+python -m compileall -q apps packages evals scripts -> exit code: 0
+python scripts/check_migrations.py -> exit code: 0
+migration static check passed: 27 file(s)

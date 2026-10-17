@@ -1,0 +1,164 @@
+{
+  "generated_at": "2026-10-17T07:23:51.871595+00:00",
+  "started_at": "2026-10-17T07:23:26.754375+00:00",
+  "source": {
+    "name": "腾讯招聘（join.qq.com）",
+    "origin": "https://join.qq.com",
+    "list_api": "https://join.qq.com/api/v1/position/searchPosition",
+    "detail_api": "https://join.qq.com/api/v1/jobDetails/getJobDetailsByPostId",
+    "project_mapping_ids": [
+      2,
+      104
+    ],
+    "access": "public read-only JSON API，无登录/无验证码"
+  },
+  "database": "C:\\Users\\ZJL\\AppData\\Local\\Temp\\internops-task005-20261017T072326Z.sqlite",
+  "crawler_metrics": {
+    "crawler": "tencent_internship",
+    "read_only": true,
+    "origin": "https://join.qq.com",
+    "project_mapping_ids": [
+      2,
+      104
+    ],
+    "pages_seen": 6,
+    "listed_unique": 255,
+    "advertised_total": 255,
+    "detail_ok": 60,
+    "delisted": 0,
+    "delisted_sample": [],
+    "detail_failed": 0,
+    "detail_without_requirement": 0,
+    "failure_samples": [],
+    "detail_url_samples": [
+      "https://join.qq.com/post_detail.html?postid=1200791473415778304",
+      "https://join.qq.com/post_detail.html?postid=1153452731391100928",
+      "https://join.qq.com/post_detail.html?postid=1153452731391100929",
+      "https://join.qq.com/post_detail.html?postid=1200889496565214210",
+      "https://join.qq.com/post_detail.html?postid=1199423750186201088"
+    ]
+  },
+  "first_run": {
+    "new": 11,
+    "rejected": 53,
+    "crawl_failures": 1,
+    "rejection_reasons": {
+      "direction_out": 53
+    }
+  },
+  "after_first_run": {
+    "rows": 11,
+    "tracks": {
+      "internship": 11
+    },
+    "qualification": {
+      "undetermined": 7,
+      "qualified": 4
+    },
+    "jd_complete_rows": 11,
+    "rows_with_requirement_section": 11,
+    "analysis_status": {
+      "pending": 7
+    }
+  },
+  "second_run": {
+    "new": 0,
+    "rejected": 49,
+    "crawl_failures": 1
+  },
+  "after_second_run": {
+    "rows": 11,
+    "tracks": {
+      "internship": 11
+    },
+    "qualification": {
+      "undetermined": 7,
+      "qualified": 4
+    },
+    "jd_complete_rows": 11,
+    "rows_with_requirement_section": 11,
+    "analysis_status": {
+      "pending": 7
+    }
+  },
+  "queries": {
+    "internship": {
+      "count": 11,
+      "ids_sample": [
+        "tencent-intern:1216462959547938817",
+        "tencent-intern:1216462959547938816",
+        "tencent-intern:1216462959547938818"
+      ]
+    },
+    "campus": {
+      "count": 0,
+      "ids_sample": []
+    },
+    "all": {
+      "count": 11,
+      "ids_sample": [
+        "tencent-intern:1216462959547938817",
+        "tencent-intern:1216462959547938816",
+        "tencent-intern:1216462959547938818"
+      ]
+    }
+  },
+  "samples": [
+    {
+      "id": "tencent-intern:1216462959547938817",
+      "title": "AI-HR培训生(分析方向)",
+      "city": "深圳总部、上海",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "undetermined",
+      "jd_chars": 655,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1216462959547938817"
+    },
+    {
+      "id": "tencent-intern:1216462959547938816",
+      "title": "AI-HR培训生(创意方向)",
+      "city": "深圳总部、广州",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "undetermined",
+      "jd_chars": 647,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1216462959547938816"
+    },
+    {
+      "id": "tencent-intern:1216462959547938818",
+      "title": "AI-HR培训生(技术&应用方向)",
+      "city": "深圳总部、成都",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "undetermined",
+      "jd_chars": 693,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1216462959547938818"
+    },
+    {
+      "id": "tencent-intern:1216462959547938819",
+      "title": "AI-HR培训生(沟通方向)",
+      "city": "深圳总部、北京、上海、广州、成都",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "undetermined",
+      "jd_chars": 650,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1216462959547938819"
+    },
+    {
+      "id": "tencent-intern:1212816222497017856",
+      "title": "AI安全技术工程师",
+      "city": "深圳总部、北京、上海、广州",
+      "job_type": "internship",
+      "seasons": [],
+      "conversion": "unknown",
+      "qualification": "undetermined",
+      "jd_chars": 604,
+      "detail_url": "https://join.qq.com/post_detail.html?postid=1212816222497017856"
+    }
+  ],
+  "limit_applied": 60
+}

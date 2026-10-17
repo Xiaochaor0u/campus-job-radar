@@ -1,0 +1,19 @@
+﻿# TASK-002a 测试证据
+# 生成时间: 2026-10-17 12:33:43 +08:00
+# git HEAD (提交前): 23e956a
+# python: Python 3.11.9
+# 说明: 下列结果由 junit xml 统计，非人工填写
+
+## 命令 1: 新增包单元测试
+$ python -m pytest -q tests/test_internship_classification.py tests/test_internship_requirements.py tests/test_internship_evaluation.py
+RESULT: total=83 failures=0 errors=0 skipped=0
+
+## 命令 2: 业务核心回归子集（20 个文件）
+RESULT: total=359 failures=0 errors=0 skipped=0
+
+## 命令 3: 编译检查
+python -m compileall -q apps packages evals scripts -> exit code: 0
+
+## 命令 4: 迁移静态检查
+python scripts/check_migrations.py -> exit code: 0
+migration static check passed: 26 file(s)

@@ -1,0 +1,20 @@
+﻿# TASK-003 测试证据
+# 生成时间: 2026-10-17 14:22:52 +08:00
+# git HEAD (提交前): 9c85fe6
+# python: Python 3.11.9
+
+## 1. InternOps / internship 相关测试（7 个文件）
+RESULT: total=139 failures=0 errors=0 skipped=0
+
+## 2. 业务核心回归子集（25 个文件，含 1 的 5 个）
+RESULT: total=489 failures=0 errors=0 skipped=0
+
+## 3. 参考：pytest-public.ini 默认排除的 tests/test_recruitment_core.py
+RESULT: total=15 failures=1 errors=0 skipped=0
+KNOWN PRE-EXISTING FAILURE: test_gongji_uses_identity_bound_drawer_detail_recipe
+  原因: FileNotFoundError config/companies.yaml（本地配置，gitignored，与本轮改动无关）
+
+## 4. 编译与迁移静态检查
+python -m compileall -q apps packages evals scripts -> exit code: 0
+python scripts/check_migrations.py -> exit code: 0
+migration static check passed: 27 file(s)

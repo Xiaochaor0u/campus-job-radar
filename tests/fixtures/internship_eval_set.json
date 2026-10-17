@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "note": "可人工核验的实习分析评测集。synthetic_cases 是手写 JD + 精确期望；real_cases 使用 tests/fixtures/tencent_intern_sample.json 中录制的真实腾讯实习 JD，只断言可先验证明的不变量（是实习、JD 两段齐全、至少抽到一条要求证据），不复制当前实现输出。运行：python -m evals.internship_eval",
+  "synthetic_cases": [
+    {
+      "id": "duration-shortfall-2-vs-3",
+      "title": "Python开发实习生",
+      "city": "西安",
+      "jd_raw": "岗位职责：参与内部工具开发。任职要求：本科及以上，2028届，工作地点：西安，能连续实习3个月以上，每周到岗3天。",
+      "expect": {
+        "track": "internship",
+        "qualification": "qualified",
+        "duration_status": "gap",
+        "duration_negotiability": "unknown",
+        "retained": true
+      },
+      "rationale": "候选人暑假只有2个月，岗位要求3个月：差距是确定事实（gap），但是否可协商未知（unknown），岗位必须保留。"
+    },
+    {
+      "id": "mandatory-degree-gate",
+      "title": "测试开发实习生",
+      "city": "西安",
+      "jd_raw": "岗位职责：负责接口自动化测试。任职要求：硕士及以上学历，2028届，能连续实习3个月以上。",
+      "expect": {
+        "track": "internship",
+        "qualification": "not_qualified",
+        "retained": true
+      },
+      "rationale": "JD 写明硕士及以上，候选人本科：属于明确资格门槛，判为不合格，但岗位仍保留并可解释。"
+    },
+    {
+      "id": "explicit-cohort-gate",
+      "title": "数据分析实习生",
+      "city": "郑州",
+      "jd_raw": "岗位职责：负责业务数据分析。任职要求：本科及以上，仅限2027届毕业生，每周到岗3天。",
+      "expect": {
+        "track": "internship",
+        "qualification": "not_qualified",
+        "retained": true
+      },
+      "rationale": "实习管线不按届别筛选，但 JD 明确写了「仅限2027届」，属于门槛，候选人2028届不符。"
+    },
+    {
+      "id": "unknown-conditions",
+      "title": "后端开发实习生",
+      "jd_raw": "岗位职责：参与服务端功能开发与维护，配合完成需求评审与上线支持。任职要求：具备良好的沟通能力与团队协作意识，学习能力强。",
+      "expect": {
+        "track": "internship",
+        "qualification": "undetermined",
+        "duration_status": "unknown",
+        "retained": true
+      },
+      "rationale": "JD 未写学历/时长/城市：应记为 unknown 而不是差距，资格无法判定但不得淘汰。"
+    },
+    {
+      "id": "formal-role-with-internship-experience-phrase",
+      "title": "C++软件开发工程师",
+      "job_type": "校园招聘",
+      "jd_raw": "岗位职责：负责核心系统研发。任职要求：本科及以上，有相关实习经历者优先。",
+      "expect": {
+        "track": "campus",
+        "retained": true
+      },
+      "rationale": "正式岗位把「实习经历」当加分项，不得被误判为实习岗（第5项要求）。"
+    }
+  ],
+  "real_cases": [
+    {
+      "post_id": "1200791473415778304",
+      "rationale": "真实腾讯「应届实习」岗位（后台开发）。只断言是实习、JD 两段齐全、抽到至少一条要求证据。"
+    },
+    {
+      "post_id": "1199423750186201088",
+      "rationale": "真实腾讯「应届实习」岗位（算法-多模态方向），用于核对不同方向的 JD 也能正确抽取。"
+    },
+    {
+      "post_id": "1200889496565214208",
+      "rationale": "真实腾讯「应届实习」岗位（算法-自然语言处理方向），用于核对抽取稳定性。"
+    }
+  ]
+}
