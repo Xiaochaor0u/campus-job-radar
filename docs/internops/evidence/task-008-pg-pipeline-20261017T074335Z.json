@@ -1,0 +1,77 @@
+{
+  "generated_at": "2026-10-17T07:43:35.844156+00:00",
+  "database": "PostgreSQL 16 (disposable container, no volume)",
+  "image": "pgvector/pgvector:pg16",
+  "sample_source": "tests\\fixtures\\tencent_intern_sample.json",
+  "checks": [
+    {
+      "passed": true,
+      "label": "target is PostgreSQL"
+    },
+    {
+      "passed": true,
+      "label": "major version is 16"
+    },
+    {
+      "passed": true,
+      "label": "database starts empty"
+    },
+    {
+      "passed": true,
+      "label": "migrations 001-027 applied"
+    },
+    {
+      "passed": true,
+      "label": "internship columns are JSONB"
+    },
+    {
+      "passed": true,
+      "label": "internship rows written"
+    },
+    {
+      "passed": true,
+      "label": "all rows are internships"
+    },
+    {
+      "passed": true,
+      "label": "JD stored with requirement section"
+    },
+    {
+      "passed": true,
+      "label": "condition evaluation stored as JSONB"
+    },
+    {
+      "passed": true,
+      "label": "internship query returns the rows"
+    },
+    {
+      "passed": true,
+      "label": "campus query is isolated"
+    },
+    {
+      "passed": true,
+      "label": "idempotent re-run keeps row count"
+    },
+    {
+      "passed": true,
+      "label": "re-run inserts nothing"
+    },
+    {
+      "passed": true,
+      "label": "repository detail exposes the track"
+    }
+  ],
+  "summary": {
+    "rows": 1,
+    "ids": [
+      "tencent-intern:1199423750186201088"
+    ],
+    "qualification": [
+      "undetermined"
+    ],
+    "first_run_new": 1,
+    "second_run_new": 0,
+    "internship_query_total": 1,
+    "campus_query_total": 0
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "generated_at": "2026-10-17T08:33:05.205702+00:00",
+  "provider": "DeepSeek",
+  "model": "deepseek-flash",
+  "endpoint": "https://api.deepseek.com/anthropic/v1/messages",
+  "transport": "live",
+  "analyses": 2,
+  "scenarios": [
+    {
+      "scenario": "A",
+      "kind": "recorded_public_tencent",
+      "job_id": "tencent-intern:1200791473415778304",
+      "title": "后台开发",
+      "status": "complete",
+      "match_score": 23,
+      "recommendation": "不推荐",
+      "summary": "岗位为后台开发，核心要求C/Java/Go等语言及网络、后端能力，候选人仅有Python、Linux和自动化测试，方向相邻但核心技能与项目证据不足。",
+      "evidence_grounded": "4/4",
+      "advantages": [
+        "具备Python与Linux基础",
+        "自动化测试经验可迁移到线上问题定位"
+      ],
+      "gaps": [
+        "缺少C/C++/Java/Go核心开发语言证据",
+        "无后端服务开发与AI集成项目经历",
+        "无网络协议与数据库实践",
+        "TCP/UDP网络协议及相关编程、进程间通讯编程"
+      ],
+      "rule_duration": {
+        "status": "unknown",
+        "negotiability": "not_negotiable",
+        "confirmation_required": false
+      },
+      "rule_gaps_present_in_record": true,
+      "model": "deepseek-flash",
+      "refusal_reason": "",
+      "tokens": {
+        "in": 2455,
+        "out": 485
+      },
+      "quote_sha256": [
+        "e8892f084f9edade",
+        "25afd405232cde30",
+        "03ed338f3f21ea6b",
+        "0c4c2c5fa28f68fd"
+      ],
+      "quote_count": 4,
+      "quotes_redacted": "原文已在运行时校验，此处不保留第三方文本"
+    },
+    {
+      "scenario": "B",
+      "kind": "synthetic_public_style",
+      "job_id": "task010-scenario-b",
+      "title": "Python开发实习生（西安）",
+      "status": "complete",
+      "match_score": 56,
+      "recommendation": "不推荐",
+      "summary": "岗位方向为Python工具与自动化脚本开发，与候选人技能相邻；学历城市满足，但项目证据缺失且实习时长有差距，匹配中等偏弱。",
+      "evidence_grounded": "5/5",
+      "advantages": [
+        "Python与Linux基础",
+        "自动化测试技能",
+        "学历与城市条件满足"
+      ],
+      "gaps": [
+        "duration_months：可实习 2 个月，少于要求的 3 个月，明确存在 1 个月差距；JD 未说明是否可协商，需向招聘方核实（JD：实习3个月）",
+        "实习时长差1个月",
+        "缺乏直接项目证据"
+      ],
+      "rule_duration": {
+        "status": "gap",
+        "negotiability": "unknown",
+        "confirmation_required": true
+      },
+      "rule_gaps_present_in_record": true,
+      "model": "deepseek-flash",
+      "refusal_reason": "",
+      "tokens": {
+        "in": 2217,
+        "out": 398
+      },
+      "quote_sha256": [
+        "7bd238e67421bada",
+        "628162a82cd61635",
+        "1806846d114babc7",
+        "15a25badd32f391a"
+      ],
+      "quote_count": 4,
+      "quotes_redacted": "原文已在运行时校验，此处不保留第三方文本"
+    }
+  ],
+  "storage": {
+    "stored_rows": 2,
+    "browse_internship_total": 2,
+    "detail_readable": 2,
+    "browse_ids": [
+      "task010-scenario-b",
+      "tencent-intern:1200791473415778304"
+    ]
+  },
+  "database": "C:\\Users\\ZJL\\AppData\\Local\\Temp\\internops-llm-20261017T083258Z.sqlite"
+}
