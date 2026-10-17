@@ -1,0 +1,43 @@
+﻿# TASK-002b 测试证据
+# 生成时间: 2026-10-17 13:51:36 +08:00
+# git HEAD (提交前): 875af94
+# python: Python 3.11.9
+# PostgreSQL: Docker 一次性容器 pgvector/pgvector:pg16，验证后已删除
+
+## 1. 单元/契约测试（24 个文件，含 83 项 internship 测试与 20 项迁移契约测试）
+RESULT: total=462 failures=0 errors=0 skipped=0
+
+## 2. PostgreSQL 迁移验证（一次性容器）
+[PASS] 001-026 applied
+[PASS] seed rows inserted
+[PASS] 027 applied
+[PASS] existing rows preserved byte-for-byte
+[PASS] row count unchanged
+[PASS] new columns default to unknown/NULL without backfill
+[PASS] JSON evidence columns are JSONB
+[PASS] track index exists
+[PASS] seasons validation function exists
+[PASS] seasons accepts NULL
+[PASS] seasons accepts empty array
+[PASS] seasons accepts valid array
+[PASS] seasons rejects duplicate labels
+[PASS] seasons rejects unknown label
+[PASS] seasons rejects non-string element
+[PASS] seasons rejects object instead of array
+[PASS] seasons rejects uppercase label
+[PASS] track CHECK rejects out-of-range value
+[PASS] track CHECK accepts internship
+[PASS] conversion CHECK rejects out-of-range value
+[PASS] no pending migrations after 027
+[PASS] ledger records 27 migrations
+[PASS] re-run applies nothing
+
+RESULT: PASSED (23 checks)
+exit code: 0
+
+## 3. 编译检查
+python -m compileall -q apps packages evals scripts -> exit code: 0
+
+## 4. 迁移静态检查
+python scripts/check_migrations.py -> exit code: 0
+migration static check passed: 27 file(s)
