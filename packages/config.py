@@ -265,6 +265,12 @@ class Settings(BaseSettings):
         return self.agent_root / "config" / "companies.yaml"
 
     @property
+    def notify_config(self) -> Path:
+        """Group-bot push configuration; missing file means push disabled."""
+
+        return self.agent_root / "config" / "notify.yaml"
+
+    @property
     def candidate_profile_config(self) -> Path:
         local = self.agent_root / ".data" / "settings" / "candidate_profile.yaml"
         if local.is_file():

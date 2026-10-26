@@ -1,22 +1,466 @@
-﻿companies:
-  - id: example-company
-    name: Example Robotics
-    careers_url: https://careers.example.com/campus
-    crawler: generic
-    integration_status: pending_verification
-    industries:
-      - robotics
-    recruitment_types:
-      - campus
-    recruitment_targets:
-      - "2027"
+﻿# 岗位监控企业清单（示例）
+#
+# 复制为 config/companies.yaml 后使用：
+#   cp config/companies.example.yaml config/companies.yaml
+#
+# 字段说明：
+#   id                  唯一标识，全库主键，建库后不要随意改动
+#   name                展示名称
+#   careers_url         招聘入口页（部分适配器会把它用作 Referer，尽量填真实页）
+#   crawler             采集适配器 key，见 packages/recruitment_core/crawlers/__init__.py
+#   integration_status  connected = 参与采集；pending_verification = 只登记不采集
+#   industries          行业标签，仅用于展示与筛选
+#   recruitment_types   campus（校招）/ internship（实习）
+#   recruitment_targets 目标届别标签，信息性字段
+#
+# 重要：下面全部是「真实实现」的适配器。
+# 上游 crawlers/placeholders.py 里还有 18 个占位类（商汤、地平线、Momenta、PonyAI、
+# 文远知行、蔚来、小鹏等），它们返回空列表，配置进去只会白跑，故不列入
+#（大华是占位类，这里改用通用 beisen 接入，见文件末尾）。
+#
+# 加入新公司的最快路径：
+#   1) 招聘页域名是 *.zhiye.com      → crawler: beisen
+#   2) 招聘页域名是 *.hotjob.cn      → crawler: hotjob
+#   3) 招聘页在 app.mokahr.com 下    → crawler: moka
+#   4) 招聘页是 jobs.*.feishu.cn     → crawler: feishu
+#   5) 其他 JS 渲染站                → crawler: render（较慢，可能抓不全）
+
+companies:
+  # ── 互联网 / 游戏 / 软件 ──────────────────────────────────────────────
+  - id: tencent
+    name: 腾讯
+    careers_url: https://join.qq.com/
+    crawler: tencent
+    integration_status: connected
+    industries: [internet]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
 
   - id: tencent-internship
     name: 腾讯实习
-    careers_url: https://join.qq.com
+    careers_url: https://join.qq.com/
     crawler: tencent_internship
     integration_status: connected
-    industries:
-      - internet
-    recruitment_types:
-      - internship
+    industries: [internet]
+    recruitment_types: [internship]
+
+  - id: tencent-music
+    name: 腾讯音乐
+    careers_url: https://join.tencentmusic.com/
+    crawler: tencent_music
+    integration_status: connected
+    industries: [internet, music]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: alibaba
+    name: 阿里巴巴
+    careers_url: https://talent.alibaba.com/campus/
+    crawler: alibaba
+    integration_status: connected
+    industries: [internet, ecommerce]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: bytedance
+    name: 字节跳动
+    careers_url: https://jobs.bytedance.com/campus
+    crawler: bytedance
+    integration_status: connected
+    industries: [internet]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: meituan
+    name: 美团
+    careers_url: https://zhaopin.meituan.com/web/campus
+    crawler: meituan
+    integration_status: connected
+    industries: [internet, local-services]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: jd
+    name: 京东
+    careers_url: https://campus.jd.com/
+    crawler: jd
+    integration_status: connected
+    industries: [internet, ecommerce]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: pdd
+    name: 拼多多
+    careers_url: https://careers.pddglobalhr.com/campus
+    crawler: pdd
+    integration_status: connected
+    industries: [internet, ecommerce]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: baidu
+    name: 百度
+    careers_url: https://talent.baidu.com/jobs/campus
+    crawler: baidu
+    integration_status: connected
+    industries: [internet, ai]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: baidu-internship
+    name: 百度实习
+    careers_url: https://talent.baidu.com/jobs/intern
+    crawler: baidu_internship
+    integration_status: connected
+    industries: [internet, ai]
+    recruitment_types: [internship]
+
+  - id: kuaishou
+    name: 快手
+    careers_url: https://campus.kuaishou.cn/
+    crawler: kuaishou
+    integration_status: connected
+    industries: [internet, short-video]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: bilibili
+    name: 哔哩哔哩
+    careers_url: https://jobs.bilibili.com/campus
+    crawler: bilibili
+    integration_status: connected
+    industries: [internet, content]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: netease
+    name: 网易
+    careers_url: https://campus.163.com/
+    crawler: netease
+    integration_status: connected
+    industries: [internet, gaming]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: netease-leihuo
+    name: 网易雷火
+    careers_url: https://xiaozhao.leihuo.netease.com/
+    crawler: leihuo
+    integration_status: connected
+    industries: [gaming]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: mihoyo
+    name: 米哈游
+    careers_url: https://ats.openout.mihoyo.com/
+    crawler: mihoyo
+    integration_status: connected
+    industries: [gaming]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: duoyi
+    name: 多益网络
+    careers_url: https://xz.duoyi.com/
+    crawler: duoyi
+    integration_status: connected
+    industries: [gaming]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: gbits
+    name: 吉比特
+    careers_url: https://joinserver.g-bits.com/
+    crawler: gbits
+    integration_status: connected
+    industries: [gaming]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: ourpalm
+    name: 掌趣科技
+    careers_url: https://app.mokahr.com/campus_apply/ourpalm
+    crawler: ourpalm
+    integration_status: connected
+    industries: [gaming]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: "4399"
+    name: 4399 游戏
+    careers_url: https://job.4399.com/
+    crawler: job4399
+    integration_status: connected
+    industries: [gaming]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: xiaomi
+    name: 小米
+    careers_url: https://xiaomi.jobs.f.mioffice.cn/campus
+    crawler: xiaomi
+    integration_status: connected
+    industries: [internet, hardware]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: oppo
+    name: OPPO
+    careers_url: https://careers.oppo.com/campus
+    crawler: oppo
+    integration_status: connected
+    industries: [hardware]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: lenovo
+    name: 联想
+    careers_url: https://talent.lenovo.com.cn/
+    crawler: lenovo
+    integration_status: connected
+    industries: [hardware]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: fanruan
+    name: 帆软
+    careers_url: https://join.fanruan.com/
+    crawler: fanruan
+    integration_status: connected
+    industries: [software, data]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: tonghuashun
+    name: 同花顺
+    careers_url: https://job.10jqka.com.cn/
+    crawler: tonghuashun
+    integration_status: connected
+    industries: [fintech]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: chaitin
+    name: 长亭科技
+    careers_url: https://chaitin.zhiye.com/
+    crawler: chaitin
+    integration_status: connected
+    industries: [security]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  # ── 硬科技 / 智能硬件 / 制造（岗位量大，技术岗与互联网高度重合）──────────
+  - id: huawei
+    name: 华为
+    careers_url: https://career.huawei.com/reccampportal/portal5/campus-recruitment.html
+    crawler: huawei
+    integration_status: connected
+    industries: [hardware, ict]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: dji
+    name: 大疆
+    careers_url: https://apply.careers.dji.com/campus
+    crawler: dji
+    integration_status: connected
+    industries: [hardware, robotics]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: hikvision
+    name: 海康威视
+    careers_url: https://campushr.hikvision.com/school
+    crawler: hikvision
+    integration_status: connected
+    industries: [hardware, vision]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: inovance
+    name: 汇川技术
+    careers_url: https://recruit.inovance.com/
+    crawler: inovance
+    integration_status: connected
+    industries: [industrial, automation]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: unitree
+    name: 宇树科技
+    careers_url: https://www.unitree.com/careers
+    crawler: unitree
+    integration_status: connected
+    industries: [robotics]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: byd
+    name: 比亚迪
+    careers_url: https://job.byd.com/
+    crawler: byd
+    integration_status: connected
+    industries: [automotive]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: lixiang
+    name: 理想汽车
+    careers_url: https://www.lixiang.com/careers
+    crawler: lixiang
+    integration_status: connected
+    industries: [automotive]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: sf
+    name: 顺丰
+    careers_url: https://campus.sf-express.com/
+    crawler: sf
+    integration_status: connected
+    industries: [logistics]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: boe
+    name: 京东方
+    careers_url: https://campus.boe.com/
+    crawler: boe
+    integration_status: connected
+    industries: [display, hardware]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: cvte
+    name: 视源股份
+    careers_url: https://campus.cvte.com/
+    crawler: cvte
+    integration_status: connected
+    industries: [hardware]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: tplink
+    name: TP-LINK
+    careers_url: https://hr.tp-link.com.cn/
+    crawler: tplink
+    integration_status: connected
+    industries: [hardware, network]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: isoftstone
+    name: 软通动力
+    careers_url: https://career.isoftstone.com/
+    crawler: isoftstone
+    integration_status: connected
+    industries: [software, outsourcing]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: zmotion
+    name: 正运动技术
+    careers_url: https://www.zmotion.com.cn/
+    crawler: zmotion
+    integration_status: connected
+    industries: [industrial, motion-control]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  # ── 中小厂：北森（*.zhiye.com）租户 —— 2026-10-26 已实测 API 返回真实校招岗 ──
+  # 实测在招岗位数：传音 177 / 大华 137 / 讯飞 120 / 新华三 79 / 贝壳 29。
+  # 通用 beisen 适配器直接可用，无需写代码。找到别的公司 zhiye.com 域名照抄即可。
+  - id: transsion
+    name: 传音控股
+    careers_url: https://transsion.zhiye.com/
+    crawler: beisen
+    integration_status: connected
+    industries: [hardware, mobile]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: dahua
+    name: 大华股份
+    careers_url: https://dahua.zhiye.com/
+    crawler: beisen
+    integration_status: connected
+    industries: [hardware, vision, security]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: iflytek
+    name: 科大讯飞
+    careers_url: https://iflytek.zhiye.com/
+    crawler: beisen
+    integration_status: connected
+    industries: [ai, voice]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: h3c
+    name: 新华三
+    careers_url: https://h3c.zhiye.com/
+    crawler: beisen
+    integration_status: connected
+    industries: [hardware, network, cloud]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: beike
+    name: 贝壳找房
+    careers_url: https://ke.zhiye.com/
+    crawler: beisen
+    integration_status: connected
+    industries: [internet, real-estate]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  # ── 中小厂：Moka / 飞书租户 —— 入口已确认，需浏览器渲染，尚未实测抓取 ──────
+  # 验证流程：把 integration_status 改成 connected，跑一次
+  #   python scripts/run_local_task.py --task daily_recruitment_intelligence
+  # 看「公司」视图的抓取状态；抓到岗位就保留，抓不到改回 pending 或换适配器。
+  - id: huolala
+    name: 货拉拉
+    careers_url: https://app.mokahr.com/campus-recruitment/huolalahr/98660
+    crawler: moka
+    integration_status: pending_verification
+    industries: [internet, logistics]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: zhihu
+    name: 知乎
+    careers_url: https://app.mokahr.com/apply/zhihu/78336
+    crawler: moka
+    integration_status: pending_verification
+    industries: [internet, content]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: vip
+    name: 唯品会
+    careers_url: https://app-tc.mokahr.com/social-recruitment/vipshophr/10038
+    crawler: moka
+    integration_status: pending_verification
+    industries: [internet, ecommerce]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: dewu
+    name: 得物
+    careers_url: https://poizon.jobs.feishu.cn/index/position/list
+    crawler: feishu
+    integration_status: pending_verification
+    industries: [internet, ecommerce]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]
+
+  - id: xiaopeng
+    name: 小鹏汽车
+    careers_url: https://xiaopeng.jobs.feishu.cn/campus
+    crawler: feishu
+    integration_status: pending_verification
+    industries: [automotive]
+    recruitment_types: [campus]
+    recruitment_targets: ["2027"]

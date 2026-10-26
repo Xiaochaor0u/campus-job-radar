@@ -87,9 +87,11 @@ if ($TaskNamePrefix -notmatch '^[A-Za-z0-9._-]+$') {
 
 $tasks = @(
     [pscustomobject]@{ Id = "daily_recruitment_intelligence"; StartTime = "08:00" }
+    [pscustomobject]@{ Id = "offerbiu_announcements"; StartTime = "08:30" }
     [pscustomobject]@{ Id = "crawler_health"; StartTime = "08:15" }
     [pscustomobject]@{ Id = "application_progress"; StartTime = "20:00" }
     [pscustomobject]@{ Id = "recruitment_mailbox"; StartTime = "09:00" }
+    [pscustomobject]@{ Id = "daily_intelligence_digest"; StartTime = "09:30" }
 )
 
 foreach ($task in $tasks) {

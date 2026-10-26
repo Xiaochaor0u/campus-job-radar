@@ -1,354 +1,502 @@
-# RecruitOps 秋招工作台
+# 岗位情报站 · RecruitOps
 
-> **本仓库包含 InternOps 二次开发**（实习岗位方向，v0.1.0）。实习相关的功能、架构、运行与验收说明见
-> **[docs/internops/README.md](docs/internops/README.md)**；下文为上游 RecruitOps 的原始说明。
+> 帮你盯着几百家公司的招聘官网，一有新岗位就告诉你。
+> **拉下来自带 22444 个岗位**，不用先学爬虫，装好就能看。
 
-> 一个面向校园招聘的 Windows 桌面软件：发现和筛选岗位、补全 JD、匹配评分、辅助投递、维护投递进度、处理招聘邮件，并把笔试、面试和待办统一到一处。
+**解决的痛点**：秋招、春招、实习的招聘公告发布得很零散。你不知道哪家公司今天开了新批次，只能反复刷自己记得的那几个官网，或者靠群里、短视频里的截图。这个工具把这些事自动化：每天定时去官网看一遍，把"新增了什么岗位"整理成一张清单给你。
 
-[![Latest release](https://img.shields.io/github/v/release/849879772/recruitops-agent?display_name=tag&sort=semver)](https://github.com/849879772/recruitops-agent/releases/latest)
-[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?logo=windows)](https://github.com/849879772/recruitops-agent/releases/latest)
-[![CI](https://github.com/849879772/recruitops-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/849879772/recruitops-agent/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+---
 
-![RecruitOps 岗位工作台](docs/assets/jobs.png)
+## 目录
 
-## 主要功能
+- [它到底能做什么](#它到底能做什么)
+- [第 0 步：装 Python（只需一次）](#第-0-步装-python只需一次)
+- [第 1 步：下载这个项目](#第-1-步下载这个项目)
+- [第 2 步：打开命令行](#第-2-步打开命令行)
+- [第 3 步：一键启动](#第-3-步一键启动)
+- [第 4 步：看懂工作台](#第-4-步看懂工作台)
+- [第 5 步：让它每天自动更新（可选）](#第-5-步让它每天自动更新可选)
+- [第 6 步：推送到微信/QQ 群（可选）](#第-6-步推送到微信qq-群可选)
+- [常见问题（照着做就行）](#常见问题照着做就行)
+- [进阶用法（不写代码也能做）](#进阶用法不写代码也能做)
+- [技术说明（给开发者）](#技术说明给开发者)
+- [合规与数据](#合规与数据)
 
-| 功能 | 能做什么 |
+---
+
+## 它到底能做什么
+
+装好之后，打开浏览器你会看到三块东西：
+
+| 页面 | 你能看到什么 |
 | --- | --- |
-| 校招岗位发现 | 从招聘聚合来源获取公司和校招入口，持续维护可抓取的官网来源 |
-| 岗位抓取与 JD 补全 | 抓取岗位列表，先按标题关键词筛选，再补全需要分析的岗位详情 |
-| 简历解析与匹配评分 | 从简历生成技能、项目摘要和岗位关键词，按个人背景给岗位评分并解释优势与不足 |
-| 内置招聘浏览器 | 在软件内打开招聘官网、保留登录状态、扫描表单并进行简历闪填 |
-| 投递记录 | 手动登记或从内置浏览器保存投递，维护已投递、笔试、面试、Offer 和已挂阶段 |
-| 官网进度复核 | 只复核未挂岗位，读取官方投递记录页并保留阶段证据，不用低优先级信息覆盖已确认进度 |
-| 招聘邮箱 | 通过只读 IMAP 同步招聘邮件，识别投递、测评、笔试、面试和拒信 |
-| 日程与待办 | 将有明确时间的招聘事项加入日程，将时间未定的事项保留为待办 |
-| 求职助理 | 用自然语言查询岗位、处理邮件、复核投递进度、运行抓取和管理定时任务 |
-| 自动化任务 | 为抓取、评分、邮箱处理和投递复核设置多个每日执行时间，查看执行详情和失败原因 |
+| **今日新发布** | 今天哪些公司放了新岗位，按公司分组，点开就是官网链接 |
+| **全部岗位** | 按校招 / 实习、按来源筛选，支持搜索公司名、岗位名、城市 |
+| **实习岗位** | 专门的实习岗列表（含招募条件、能不能投的分析） |
 
-## 下载与启动
+数据规模（自带，不需要你先爬）：
 
-### 系统要求
+| 项目 | 数量 |
+| --- | --- |
+| 岗位 | 22444 个 |
+| 覆盖公司 | 12488 家 |
+| 校招 | 20149 个 |
+| 实习 | 2295 个 |
 
-- Windows 10 或 Windows 11，64 位
-- 建议至少 8 GB 内存
-- 建议预留 3 GB 可用磁盘空间
-- 能访问模型 API、招聘网站和邮箱 IMAP 服务的网络
+这些数据打包在项目里（`data/seed/jobs.jsonl.gz`，3 MB），所以你拉下来就有内容。
 
-### 1. 下载桌面版
+---
 
-当前稳定版为 RecruitOps v0.1.7（2026-10-07），请下载 `RecruitOps-v0.1.7.zip`：
+## 第 0 步：装 Python（只需一次）
 
-- [GitHub Releases](https://github.com/849879772/recruitops-agent/releases/tag/v0.1.7)
-- [Gitee v0.1.7 更新说明](https://gitee.com/zs-k/recruitops-agent/blob/main/docs/RELEASE_v0.1.7.md)
-- [123 云盘（永久分享，安装包与校验文件）](https://1835739780.share.123pan.cn/123pan/QbN4Td-ixbXd)
+这个项目用 Python 写的，需要先装它。**装过的可以跳过。**
 
-下载完成后可按需核对 SHA-256：
+### Windows
 
-```text
-6045928839A2D31B56F8AD1B32868B14C675321A0935937F374522350EFEE030
-```
+1. 打开 <https://www.python.org/downloads/>，点黄色大按钮下载 Python 3.11 或更新版本。
+2. 双击安装包。**安装界面第一页最下面有个勾选框 `Add python.exe to PATH`，一定要勾上。** 不勾的话后面所有命令都会报错。
+3. 点 `Install Now`，等进度条走完，点 `Close`。
+4. 验证：按 `Win + R`，输入 `cmd` 回车，在黑窗口里输入：
 
-如果旧版已经爬取到岗位，或已有投递记录、招聘邮件，请先阅读[已有数据的桌面版升级步骤](docs/UPGRADE_EXISTING_DATA.md)。不要直接把旧版 `.data` 复制到不同安装路径。
+   ```bat
+   python --version
+   ```
 
-本版重点完善官网页面与截图证据复核、岗位对应关系人工确认、邮件识别重试与多岗位测评关联、定时任务启动与部分成果汇报，并优化登录保留、启动备份和投递看板。完整范围与限制见 [v0.1.7 更新说明](docs/RELEASE_v0.1.7.md)。
+   看到 `Python 3.11.x` 或更高就成功了。
 
-### 2. 完整解压
+### macOS
 
-将压缩包完整解压到可写的短路径，例如：
+1. 打开 <https://www.python.org/downloads/> 下载 macOS 安装包，双击一路下一步。
+2. 验证：打开「终端」（启动台搜 Terminal），输入：
 
-```text
-D:\RecruitOps
-```
+   ```bash
+   python3 --version
+   ```
 
-不要直接在压缩包预览窗口中运行，也不要只复制其中的 EXE。数据库、Python、Node.js、Chromium 和 PostgreSQL 都是软件的内部组件，必须和主程序保持原有目录结构。
+---
 
-### 3. 启动唯一入口
+## 第 1 步：下载这个项目
 
-双击：
+### 方法 A：直接下载（不用装 Git）
 
-```text
-RecruitOps-Desktop-Preview.exe
-```
+1. 打开本项目的 GitHub 页面。
+2. 点绿色按钮 `Code` → `Download ZIP`。
+3. 下载完成后，**解压到桌面**（不要在压缩包里直接运行）。
+4. 会得到一个文件夹，名字类似 `recruitops-agent-main`，可以改名为 `recruitops-agent`。
 
-普通用户只需要运行这一个文件，不需要启动 CMD 脚本，也不需要单独启动目录里的其他程序。首次启动会初始化本地数据库和运行组件，时间可能比之后启动稍长。
+> 路径里最好不要有空格，放在桌面或 `C:\recruitops-agent` 都行。
 
-> 桌面版不要求预先安装 Docker、Python、Node.js、PostgreSQL 或浏览器插件。
-
-## 首次配置
-
-启动后进入左侧 **配置** 页面，按下面顺序完成设置。
-
-### 1. 配置模型连接
-
-1. 点击 **添加连接**，或编辑已有的主连接。
-2. 使用 `DeepSeek` 官方接口（地址固定为 `https://api.deepseek.com`），填写官方 API 密钥；不再支持第三方 OpenAI 兼容服务。
-3. 选择 `deepseek-flash` 或 `deepseek-v4-pro` 并填写 API Key；官方地址不可编辑。
-4. 点击 **测试连接**。测试会检查鉴权、模型名称、结构化输出和求职助理接口。
-5. 测试通过后点击 **保存模型连接**。
-
-可以保存多个连接，但同一时间只有一个主连接。简历解析、岗位评分、邮件理解和求职助理都使用当前主连接。
-
-旧第三方连接会停用，请重新保存 DeepSeek 官方密钥；不会把旧密钥自动发送给 DeepSeek，也不会删除业务数据。结构化解析改用官方 Responses 的 JSON Schema 约束，并保留本地字段校验与有限重试。源码改动、验证边界和发布状态见 [DeepSeek 专用接口与截断验证说明](docs/DEEPSEEK_ONLY_SCHEMA_20260925.md)。
-
-### 2. 上传并分析简历
-
-1. 上传文字版 PDF、TXT 或 Markdown 简历，文件最大 10 MB。
-2. 点击 **分析简历**。
-3. 系统会提取学历、技能、项目依据和岗位筛选关键词。
-4. 检查模型生成的关键词，根据自己的求职目标增删后再保存。
-
-岗位筛选关键词不能为空。它们用于第一轮标题筛选，决定哪些岗位值得继续抓取 JD 和评分。扫描版 PDF 如果没有文字层，请先转换为可复制文字的 PDF。
-
-### 3. 选择岗位范围
-
-- 招聘类型固定为校招正式岗位。
-- 社招和实习默认排除，不需要额外配置。
-- 在 **OfferBiu 行业大类** 中选择希望关注的行业方向。
-- 行业方向控制公司来源范围，岗位关键词控制具体公司内保留哪些岗位。
-
-### 4. 配置招聘邮箱
-
-1. 在邮箱网页设置中开启 IMAP。
-2. 创建授权码或应用专用密码，不要填写网页登录密码。
-3. 在 RecruitOps 中选择邮箱服务商，或填写自定义 IMAP 地址和 SSL 端口。
-4. 填写完整邮箱地址、授权码和邮件文件夹，通常为 `INBOX`。
-5. 点击 **测试邮箱连接**，通过后保存。
-
-网易 163 可直接选择预设；其他支持账号密码或应用密码登录 IMAP 的邮箱可使用自定义配置。仅支持 OAuth2 且不允许 IMAP 应用密码的 Gmail、Outlook 账号，当前版本暂不支持。
-
-### 5. 保存配置
-
-点击页面底部的 **保存并完成首次配置**。模型连接、简历关键词和行业范围准备完成后，求职助理、抓取后评分和本地定时任务会按配置自动启用，不需要再寻找额外开关。部分运行配置变更会提示重启桌面软件后生效。
-
-![个人配置页面](docs/assets/configuration.png)
-
-## 从零开始使用
-
-### 第一步：抓取并评分岗位
-
-进入 **求职助理**，发送类似下面的指令：
-
-```text
-完成一次全量岗位抓取并评分
-```
-
-也可以让助理创建每日定时任务。一次全量流程依次执行：
-
-1. 从 OfferBiu 等来源同步公司和校园招聘入口。
-2. 排除公众号、问卷、登录页、个人中心等不可直接抓取的入口。
-3. 抓取各公司当前岗位列表并保存抓取状态。
-4. 按岗位标题关键词筛出相关岗位。
-5. 对 JD 缺失或不完整的候选岗位抓取详情。
-6. 对公司和岗位进行去重、更新和失效标记。
-7. 使用简历事实完成匹配评分和优势、劣势分析。
-8. 保存检查点和最终统计；长任务中断后可从检查点恢复。
-
-任务进度中的“需要补全 JD”表示当前候选集中 JD 不完整的岗位数量，不等于本轮新抓取到的关键词命中岗位数。
-
-### 第二步：查看和筛选岗位
-
-进入 **27 届校招**：
-
-- 按公司、岗位类型、招聘平台、评分状态和匹配分筛选。
-- 高匹配岗位优先展示。
-- 打开岗位详情可查看保存的 JD、匹配摘要、个人优势和待补足项。
-- 点击招聘页按钮可在内置浏览器中打开岗位。
-
-### 第三步：在内置浏览器投递
-
-1. 打开目标公司的招聘页。
-2. 在页面中自行完成登录、验证码或滑块验证。
-3. 点击桌面工具栏的 **简历闪填**。
-4. 扫描当前页面后，软件会尝试填写能够可靠识别的文本框、单选、多选、下拉框、重复经历和附件字段。
-5. 检查内容后由你手动提交，软件不会代替用户完成最终提交。
-6. 投递完成后，在 **投递记录** 页签填写公司、岗位、投递进度链接等信息并保存。
-
-内置浏览器会为不同站点保存独立登录状态。验证码、密码和最终提交始终由用户处理。
-
-### 第四步：维护投递进度
-
-进入 **投递记录** 可以：
-
-- 手动添加、编辑或删除记录。
-- 打开保存的官方投递进度页。
-- 查看阶段历史和证据说明。
-- 让助理批量复核所有非终态岗位。
-
-状态更新采用只升不降的优先级：已由邮件、人工或可靠官网证据确认的笔试、面试等阶段，不会因为官网只显示“已投递”“筛选中”或没有状态文本而被降级。
-
-### 第五步：处理邮件和日程
-
-进入 **招聘邮箱** 点击 **同步邮件**，或让求职助理处理未处理邮件。已成功处理的邮件会保存处理状态，后续同步不会重复执行同一事件；需要人工确认的邮件会保留在待确认列表。
-
-邮件中的测评、笔试和面试如果包含明确日期，会生成日程；只有截止时间但没有具体开始时间的事项会以截止提醒保存；时间不明确的事项进入待办。
-
-![招聘邮箱演示](docs/assets/mail.png)
-
-### 第六步：查看公司来源和任务状态
-
-进入 **公司** 可以查看每个招聘来源的入口地址、抓取状态、岗位数量、JD 未完成数量和最近尝试时间。`抓取完整`、`抓取不完整` 与 `无法抓取` 会分别保留，便于后续重试和排查。
-
-![公司来源](docs/assets/companies.png)
-
-进入 **定时任务** 可以查看：
-
-- 每天的多个执行时间
-- 是否启用、下次运行时间和最近运行时间
-- 最近一次执行状态、耗时和结构化结果
-- 失败原因以及 **让助理解释** 入口
-
-定时任务依赖本地服务运行；需要在计划时间保持 RecruitOps 桌面软件开启。错过的时间点不会假装执行成功。
-
-![定时任务与最近一次抓取统计](docs/assets/automations.png)
-
-## 数据保存与升级
-
-运行数据默认保存在软件目录旁的：
-
-```text
-.data\
-```
-
-其中包含本地数据库、配置、任务检查点和招聘网站登录状态。建议定期备份整个 `.data` 目录。
-
-若旧版已有岗位、投递记录或邮件等数据，必须先正常退出软件并完整备份 `.data`。新版本先解压到临时目录，随后让新程序回到旧版的**相同绝对路径**，在首次启动前完整复制旧 `.data`，再使用原 Windows 用户启动。一次只使用一个版本，不要在软件运行时复制数据库或混用新旧程序资源。仅有待应用的数据库结构迁移时才会生成自动迁移前备份；它不能代替完整 `.data` 备份。逐步操作及回退方法见[已有数据的桌面版升级步骤](docs/UPGRADE_EXISTING_DATA.md)。
-
-## 常见问题
-
-### 到底应该启动 EXE 还是 CMD？
-
-只启动 `RecruitOps-Desktop-Preview.exe`。CMD、内部 Python、Node.js 和 PostgreSQL 程序都不是用户入口。
-
-### 桌面版需要 Docker 吗？
-
-不需要。Releases 中的压缩包已经包含完整运行环境。Docker 只面向阅读源码、参与开发、运行 CI 或部署服务端环境的开发者。
-
-### 首次打开为什么没有岗位？
-
-新安装默认是空数据。完成模型、简历关键词和行业范围配置后，运行一次全量抓取，岗位和公司数据才会逐步入库。
-
-### 出现 `missing_resource`、`packaged_isolation_root_required` 或 `init_db_failed` 怎么办？
-
-1. 确认下载的是完整 Release 压缩包。
-2. 重新完整解压到 `D:\RecruitOps` 这类短路径。
-3. 不要只移动 EXE，不要从压缩包内运行。
-4. 确认当前目录可写，并暂时避开网盘同步目录、系统保护目录和过长路径。
-5. 如果旧目录曾启动失败，先备份 `.data`，再使用全新目录测试。
-
-### 求职助理不可用怎么办？
-
-回到 **配置** 页面测试主模型连接。检查 API Key、服务地址、模型名称和账户额度；保存后如果页面提示需要重启，请退出并重新打开软件。
-
-### 邮箱连接失败怎么办？
-
-确认邮箱已开启 IMAP，并使用授权码或应用专用密码。网页登录密码通常不能用于第三方 IMAP 客户端。
-
-### 招聘官网打不开或状态读取失败怎么办？
-
-先在内置浏览器中手动完成登录和验证码，等待岗位列表或投递记录完整渲染，再重新扫描。系统不会绕过登录、验证码、滑块或网站访问限制。
-
-### Windows 提示未知发布者怎么办？
-
-当前便携版可能尚未进行商业代码签名。请确认压缩包来自本仓库 Releases，并核对 Release 页面提供的 SHA256 后再运行。
-
-## 源码运行（开发者）
-
-普通用户请使用上面的 Windows 桌面版。下面内容仅用于二次开发、调试和贡献代码。
-
-### Docker 开发环境
-
-仓库保留 Docker 配置，用于统一 PostgreSQL、API 和 CI 环境；它不是桌面软件的用户安装方式。
+### 方法 B：用 Git
 
 ```bash
-git clone https://github.com/849879772/recruitops-agent.git
-cd recruitops-agent
-cp .env.example .env
-cp config/companies.example.yaml config/companies.yaml
-cp config/candidate_profile.example.yaml config/candidate_profile.yaml
-docker compose up -d --build
+git clone https://github.com/Xiaochaor0u/recruitops-agent.git
 ```
 
-PowerShell 可将 `cp` 替换为 `Copy-Item`。服务启动后访问：
+---
 
-- Web/API：<http://127.0.0.1:8010>
-- 健康检查：<http://127.0.0.1:8010/ready>
+## 第 2 步：打开命令行
 
-停止开发环境：
+命令行就是个能敲命令的黑窗口，不用怕——你只需要复制粘贴。
 
-```bash
-docker compose down
+### Windows
+
+**最简单**：打开解压出来的文件夹，在文件夹空白处**按住 Shift + 鼠标右键**，选「在终端中打开」或「在此处打开 PowerShell 窗口」。
+
+如果没看到这个选项：按 `Win + R`，输入 `powershell` 回车，然后输入（路径换成你自己的）：
+
+```powershell
+cd "C:\Users\你的用户名\Desktop\recruitops-agent"
 ```
 
-### 本地开发与测试
+> 小技巧：输入 `cd ` 之后，把文件夹直接拖进窗口，路径会自动填上，不用手打。
 
-```bash
+### macOS
+
+打开「终端」，输入 `cd `（后面有空格），把文件夹拖进终端窗口，回车。
+
+---
+
+## 第 3 步：一键启动
+
+**把下面 4 行依次复制粘贴到命令行，每贴一行按一次回车，等它跑完再贴下一行。**
+
+### Windows（PowerShell）
+
+```powershell
 python -m venv .venv
-# Windows: .venv\Scripts\activate
-# Linux/macOS: source .venv/bin/activate
-pip install -e ".[dev]"
-playwright install chromium
-uvicorn apps.api.main:app --reload --port 8010
-python -m pytest -c pytest-public.ini
-python -m compileall apps packages scripts
-docker compose config
 ```
 
-## 技术架构
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-- **桌面层**：Electron、内置招聘浏览器、站点隔离登录和简历闪填面板
-- **应用层**：FastAPI、原生 Web UI、REST API
-- **Agent 层**：MCP typed tools、领域技能、工具路由、审批与审计边界
-- **数据层**：PostgreSQL 16、SQLAlchemy、阶段历史和任务检查点
-- **采集层**：Playwright、Requests、BeautifulSoup、招聘平台适配器
-- **可靠性**：幂等写入、分批执行、心跳、断点恢复、失败归因和冻结评测集
+```powershell
+pip install -e ".[dev]" -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
 
-核心岗位、投递、邮件和日程使用结构化数据库查询；模型主要负责简历解析、岗位评分、邮件理解和工具调用。
+```powershell
+python scripts\quickstart.py
+```
 
-## 项目结构
+### macOS / Linux
+
+```bash
+python3 -m venv .venv
+```
+
+```bash
+source .venv/bin/activate
+```
+
+```bash
+pip install -e ".[dev]" -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+```bash
+python scripts/quickstart.py
+```
+
+### 每一步在干什么
+
+| 命令 | 作用 | 大概耗时 |
+| --- | --- | --- |
+| `python -m venv .venv` | 建一个「沙盒」，依赖装在项目里，不污染系统 | 5 秒 |
+| `Activate.ps1` / `source` | 进入沙盒（成功后命令行最前面会出现 `(.venv)`） | 1 秒 |
+| `pip install -e ".[dev]"` | 下载项目依赖（约 100 MB） | 2~5 分钟 |
+| `python scripts\quickstart.py` | 导入自带岗位 + 启动网站 | 30 秒 |
+
+最后一行跑完会长这样：
 
 ```text
-apps/                 FastAPI API 与 Web 工作台
-apps/desktop/         Electron 桌面壳、内置浏览器和简历闪填
-packages/             领域模型、抓取、评分、邮件、工具和流程编排
-migrations/           PostgreSQL 数据库迁移
-config/               公司来源与候选人配置示例
-.agents/skills/       求职助理领域技能
-scripts/              启动、迁移、诊断、备份和发布脚本
-evals/                冻结评测集与可靠性评估
-tests/                单元、集成与契约测试
-docs/                 架构、安装、运行和故障排查文档
+[2/3] 导入自带岗位数据：jobs.jsonl.gz
+已导入 22444 个岗位 · 12488 家公司（已存在跳过 0）
+[3/3] 当前库中岗位：22444 个
+启动工作台：http://127.0.0.1:8010/?view=intelligence（Ctrl+C 停止）
 ```
 
-## 安全说明
+浏览器打开 <http://127.0.0.1:8010/?view=intelligence> 就能用了。
 
-- API Key、邮箱授权码和招聘网站登录状态只保存在本机运行目录中。
-- `.env`、`.data/`、数据库、日志、备份和候选人配置默认不进入 Git。
-- 不要将自己的 `.data` 目录、简历、浏览器存储或邮箱配置上传到公开仓库。
-- 登录、验证码、滑块和最终投递提交由用户本人完成。
-- 邮件与官网证据不足时保留原状态，不用猜测覆盖已确认进度。
+> **这个窗口不要关**，关掉网站就停了。停止服务按 `Ctrl + C`。
+> 下次想再打开：进项目文件夹 → 激活沙盒 → 跑最后那行命令。
 
-发现安全问题请阅读 [SECURITY.md](SECURITY.md)。
+---
 
-## 支持作者
+## 第 4 步：看懂工作台
 
-如果这个项目对你有帮助，欢迎请作者喝杯咖啡。感谢你的支持，它会帮助项目继续维护和完善。
+左侧是导航，三块常用功能：
 
-<p align="center">
-  <img src="docs/assets/wechat-support.jpg" alt="微信收款码" width="280">
-</p>
+### ① 今日新发布
 
-## 更多文档
+- 顶部四个数字：新发布 / 内容变更 / 已下架 / 有变化的企业
+- 下面按公司分组，每条前面有「新增」「变更」「下架」标签
+- **点岗位名**直接跳官网原页，可以立刻投
+- 右上角切换「最近 24 小时 / 3 天 / 7 天 / 30 天」
 
-- [安装与部署](docs/INSTALLATION.md)
-- [启动指南](docs/STARTUP_GUIDE.md)
-- [系统架构](docs/ARCHITECTURE.md)
-- [抓取流程](docs/crawling_process.md)
-- [MCP 工具](docs/MCP.md)
-- [故障排查](docs/TROUBLESHOOTING.md)
-- [贡献指南](CONTRIBUTING.md)
+> 第一次用可能显示「还没有岗位变化记录」，这正常：第一次采集只是把现存岗位记成「底账」，第二天起才记录真正的「新增」。
+
+### ② 全部岗位
+
+- 所有已收录的岗位（不只是今天新增的）
+- 可筛选：校招 / 实习、招聘公告 / 官网采集
+- 搜索框能搜公司名、岗位名、城市
+
+### ③ 实习岗位
+
+- 专门看实习岗，包含「这个实习要求什么条件」「你差在哪」
+- 上传简历后才有匹配分数（可选，不上传也能看岗位）
+
+---
+
+## 第 5 步：让它每天自动更新（可选）
+
+不做也能用，只是岗位清单不会自己变新。
+
+### Windows
+
+在项目文件夹里打开 PowerShell：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install_windows_tasks.ps1 -DryRun
+```
+
+这一步**只是预览**，会列出将要创建的 6 个计划任务，不会真的创建。确认后去掉 `-DryRun` 再跑一次：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install_windows_tasks.ps1
+```
+
+之后每天自动执行：
+
+| 时间 | 做什么 |
+| --- | --- |
+| 08:00 | 抓配置企业的官网岗位 |
+| 08:15 | 检查爬虫是否正常 |
+| 08:30 | 同步最新招聘公告（数量最多） |
+| 09:00 | 同步招聘邮箱（不用可不配） |
+| 09:30 | 把新岗位推到群里（需先做第 6 步） |
+| 20:00 | 复核投递进度（不用可不配） |
+
+想取消：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\uninstall_windows_tasks.ps1
+```
+
+### macOS / Linux
+
+```bash
+crontab -e
+```
+
+粘贴下面几行（路径换成你的），保存退出：
+
+```cron
+0 8  * * * cd /你的路径/recruitops-agent && .venv/bin/python scripts/run_local_task.py --task daily_recruitment_intelligence
+30 8 * * * cd /你的路径/recruitops-agent && .venv/bin/python scripts/run_local_task.py --task offerbiu_announcements
+30 9 * * * cd /你的路径/recruitops-agent && .venv/bin/python scripts/run_local_task.py --task daily_intelligence_digest
+```
+
+---
+
+## 第 6 步：推送到微信/QQ 群（可选）
+
+宿舍群、班级群一起用：每天 09:30 自动发「今天哪些公司放岗了」。
+
+### 1. 拿一个群机器人地址
+
+| 群类型 | 怎么拿地址 |
+| --- | --- |
+| 企业微信群 | 群右上角 → 群机器人 → 添加机器人 → 复制 Webhook 地址 |
+| 钉钉群 | 群设置 → 智能群助手 → 添加机器人 → 自定义 → 复制 Webhook |
+| 飞书群 | 群设置 → 群机器人 → 添加机器人 → 自定义机器人 → 复制地址 |
+| QQ 群 | 需自建转发服务（OneBot 等），地址填到 `generic` 类型 |
+
+### 2. 填配置
+
+打开 `config` 文件夹，把 `notify.example.yaml` **复制一份改名**为 `notify.yaml`，用记事本打开填地址：
+
+```yaml
+webhooks:
+  - name: 宿舍求职群
+    type: wecom
+    url: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=你的KEY
+
+digest:
+  hours: 24
+  max_items_per_push: 8
+```
+
+`type` 填 `wecom`（企业微信）/ `dingtalk`（钉钉）/ `feishu`（飞书）/ `generic`（通用）。
+钉钉、飞书如果开了加签，再加一行 `secret: 你的密钥`。
+
+### 3. 先预览再发送
+
+```powershell
+python scripts\intelligence_digest.py
+```
+
+屏幕上会打印「将要发送的内容」。确认后加 `--push` 真发：
+
+```powershell
+python scripts\intelligence_digest.py --push
+```
+
+---
+
+## 常见问题（照着做就行）
+
+### 1. 提示「'python' 不是内部或外部命令」
+
+装 Python 时没勾 `Add python.exe to PATH`。最省事：卸载重装，**记得勾那个框**。
+
+### 2. PowerShell 提示「无法加载文件 Activate.ps1，因为在此系统上禁止运行脚本」
+
+先运行这行，再重做第 3 步：
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+### 3. `pip install` 特别慢或卡住
+
+命令里已经带了清华源。还慢就换阿里源：
+
+```powershell
+pip install -e ".[dev]" -i https://mirrors.aliyun.com/pypi/simple/
+```
+
+### 4. 页面中文乱码
+
+在 PowerShell 里先运行 `chcp 65001` 再启动。
+
+### 5. 提示端口 8010 被占用
+
+换个端口：
+
+```powershell
+python scripts\quickstart.py --port 8020
+```
+
+然后访问 <http://127.0.0.1:8020/?view=intelligence>。
+
+### 6. 页面能开，但「岗位变化」是空的
+
+正常。第一次采集只建「底账」，不算新发布。想立刻有内容：
+
+- 点「全部岗位」看已有的 2 万多个岗位；
+- 或等第二天定时任务跑完再看。
+
+### 7. 想立刻看最新岗位，不想等定时任务
+
+```powershell
+python scripts\collect_offerbiu.py --types 实习 秋招 春招 --max-pages 20
+```
+
+### 8. 只想要互联网岗位，不想要律所、医院、学校
+
+在「全部岗位」用搜索框筛，或提需求加行业筛选开关。
+
+### 9. 数据存在哪？会上传到网上吗？
+
+全部存在你电脑上的项目文件夹（`.data` 目录里的数据库），**不上传任何服务器**。想清空：停服务 → 删 `.data` 文件夹 → 重跑 `quickstart.py`。
+
+### 10. 想卸载
+
+删掉整个项目文件夹即可，不留系统级残留。
+
+---
+
+## 进阶用法（不写代码也能做）
+
+### A. 增删要监控的公司
+
+打开 `config/companies.yaml`（没有就把 `companies.example.yaml` 复制改名），每家公司一段：
+
+```yaml
+  - id: tencent
+    name: 腾讯
+    careers_url: https://join.qq.com/
+    crawler: tencent
+    integration_status: connected
+```
+
+- `integration_status` 写 `connected` 才会抓，写 `pending_verification` 只登记不抓
+- 不想要哪家，把 `connected` 改成 `pending_verification`
+- 想加新公司，复制一段，改 `id`、`name`、`careers_url`、`crawler`
+
+**`crawler` 怎么选？看招聘页网址就知道：**
+
+| 招聘页长得像 | 填什么 |
+| --- | --- |
+| `xxx.zhiye.com` | `beisen` |
+| `xxx.hotjob.cn` | `hotjob` |
+| `app.mokahr.com/campus-recruitment/xxx` | `moka` |
+| `xxx.jobs.feishu.cn` | `feishu` |
+| 其他（打开空白、要等几秒才出内容） | `render` |
+
+### B. 多拉一些岗位
+
+```powershell
+# 实习全量
+python scripts\collect_offerbiu.py --types 实习 --max-pages 60
+
+# 秋招 + 春招
+python scripts\collect_offerbiu.py --types 秋招 春招 --max-pages 150
+```
+
+### C. 更新打包的数据（分享给别人的时候）
+
+```powershell
+python scripts\export_seed.py
+```
+
+会重新生成 `data/seed/jobs.jsonl.gz`，提交到 GitHub 后，别人拉下来就自带最新岗位。
+
+---
+
+## 技术说明（给开发者）
+
+<details>
+<summary>点展开</summary>
+
+### 架构
+
+- **采集层**：Requests / Playwright / BeautifulSoup，79 个站点适配器（57 个真实实现，18 个占位）
+- **应用层**：FastAPI + 原生 HTML/CSS/JS（无前端构建）
+- **情报层**：`packages/intelligence/` —— 事件写入、日报聚合、群机器人推送、OfferBiu 公告导入
+- **调度层**：本地任务调度器 + Windows 计划任务 / cron，6 个固定任务
+- **数据层**：SQLAlchemy 2.0，SQLite（默认）/ PostgreSQL 16，迁移在 `migrations/`
+
+### 数据流
+
+```
+企业官网 / OfferBiu 公告
+        ↓  定时任务
+   job_snapshots（岗位快照）
+        ↓  与上一轮对比
+   job_events（新增/变更/下架事件）
+        ↓
+   工作台「今日新发布」 + 群机器人日报
+```
+
+设计约定：
+
+- **基线机制**：每家公司第一次采集只记底账，不产生大量「新发布」噪音
+- **事件与采集解耦**：事件写失败不影响已提交的岗位数据
+- **口径分离**：`cohort` 未知的岗位照样入库、照样进「今日新发布」，只是不进上游严格的「27 届校招」视图
+
+### 主要脚本
+
+| 脚本 | 用途 |
+| --- | --- |
+| `scripts/quickstart.py` | 一键：准备配置 + 导入种子 + 启动 |
+| `scripts/collect_offerbiu.py` | 拉招聘公告（`--dry-run` 只统计） |
+| `scripts/export_seed.py` / `import_seed.py` | 导出 / 导入岗位快照 |
+| `scripts/intelligence_digest.py` | 预览或推送日报（`--push` 真发） |
+| `scripts/run_local_task.py` | 手动触发某个定时任务 |
+| `scripts/install_windows_tasks.ps1` | 注册 Windows 计划任务 |
+
+### API
+
+| 端点 | 用途 |
+| --- | --- |
+| `GET /api/intelligence/digest?hours=24&track=internship` | 按企业分组的变化汇总 |
+| `GET /api/intelligence/events?event_type=new` | 扁平事件流 |
+| `GET /api/intelligence/jobs?track=campus&page=1` | 分页浏览全部岗位 |
+| `GET /api/intelligence/coverage` | 已入库 / 在招 / 校招口径统计 |
+| `GET /api/intelligence/push-preview` | 渲染将要推送的原文 |
+
+### 测试
+
+```bash
+python -m pytest tests/test_intelligence.py tests/test_intelligence_api.py tests/test_scheduler.py
+```
+
+</details>
+
+---
+
+## 相对上游做了什么
+
+本仓库是 [RecruitOps](https://github.com/849879772/recruitops-agent)（MIT）的二次开发：
+
+- **第一阶段 · InternOps**：实习轨道分类、条件抽取与评估（见 [docs/internops/README.md](docs/internops/README.md)）
+- **第二阶段 · 岗位情报站**：定时采集打通、新岗位事件识别、今日新发布看板、群机器人推送、OfferBiu 公告批量导入、自带岗位快照、保姆级文档
+- **未改动**：上游爬虫实现、匹配评分、邮件、投递管理、桌面壳
+
+更多细节见 [docs/INTELLIGENCE.md](docs/INTELLIGENCE.md)。
+
+---
+
+## 合规与数据
+
+- 只访问公开可访问的招聘页面，默认低频（每天 1~2 次），不绕过登录 / 验证码 / robots 限制。
+- 打包的数据只含**元数据**（公司、岗位名、城市、届别、截止时间、投递链接），**不含 JD 正文**。投递时点链接去官网看原文。
+- 数据只存本机，不上传任何服务器。
+- 对外提供服务前请自行确认站点条款并加鉴权。
+
+安全问题请见 [SECURITY.md](SECURITY.md)。
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE)。上游 [RecruitOps](https://github.com/849879772/recruitops-agent) 版权归原作者，二次开发部分同样以 MIT 发布。

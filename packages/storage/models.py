@@ -767,6 +767,58 @@ AutomationScheduleRecord = AutomationSchedule
 AutomationExecutionRecord = AutomationExecution
 
 
+#: Event types written by the intelligence writer.  ``baseline`` marks the
+#: first complete crawl for a company: every job is "new" on that run by
+#: definition, so it is recorded once as a marker and excluded from digests.
+JOB_EVENT_TYPES = frozenset({"new", "updated", "removed", "baseline"})
+
+
+class JobEvent(Base):
+    """One observed change to a job posting, persisted for the digest views.
+
+    The intelligence station compares consecutive crawls and writes one row
+    per (run, job, event type).  ``baseline`` rows exist only to answer
+    "has this company been crawled before"; they carry no job payload and are
+    never shown to users.
+    """
+
+    __tablename__ = "job_events"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('new', 'updated', 'removed', 'baseline')",
+            name="ck_job_events_event_type",
+        ),
+        Index("ix_job_events_detected_at", "detected_at"),
+        Index("ix_job_events_company_detected", "company_id", "detected_at"),
+        Index("ix_job_events_type_detected", "event_type", "detected_at"),
+        UniqueConstraint("run_id", "job_id", "event_type", name="uq_job_events_run_job_type"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    job_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    company_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    company_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    city: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    batch: Mapped[str] = mapped_column(String(64), nullable=False)
+    track: Mapped[str] = mapped_column(
+        String(32), default="unknown", server_default="unknown", nullable=False
+    )
+    detail_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    content_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
+    )
+    run_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
+    )
+
+
+JobEventRecord = JobEvent
+
+
 __all__ = [
     "AutomationExecution",
     "AutomationExecutionRecord",
@@ -800,6 +852,9 @@ __all__ = [
     "ConversationThreadRecord",
     "JobAnalysisSnapshot",
     "JobAnalysisSnapshotRecord",
+    "JobEvent",
+    "JobEventRecord",
+    "JOB_EVENT_TYPES",
     "JobSnapshot",
     "JobSnapshotRecord",
     "ScheduleEventSnapshot",

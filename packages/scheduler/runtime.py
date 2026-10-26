@@ -1385,6 +1385,7 @@ def build_runtime_task_handlers(
                     return {"status": "configuration_required", "missing": missing,
                             "agent_write_performed": False,
                             "message": "请先配置岗位标题关键词和行业范围；助理聊天不受此限制。"}
+            run_started_at = datetime.now(timezone.utc)
             result = build_daily_sync(
                 context.run_id,
                 () if requested_mode == "resume" else company_ids,
@@ -1491,6 +1492,23 @@ def build_runtime_task_handlers(
                 ),
                 "resumed_from": resume_run_id or None,
             }
+            # Intelligence station: turn this run's new/changed classification
+            # into an append-only change feed.  A failure here must never fail
+            # the crawl that already committed its snapshots.
+            if not requested_dry_run and pipeline_metrics:
+                try:
+                    from packages.intelligence import record_pipeline_events
+
+                    event_storage = agent_storage or getattr(repo, "storage", None)
+                    if event_storage is not None:
+                        response["intelligence_events"] = record_pipeline_events(
+                            event_storage,
+                            pipeline_metrics,
+                            run_id=context.run_id,
+                            run_started_at=run_started_at,
+                        ).to_dict()
+                except Exception as exc:  # noqa: BLE001 - observability only
+                    response["intelligence_events_error"] = type(exc).__name__
             if agent_storage is not None and not requested_dry_run:
                 state_store = AgentStateStore(agent_storage)
                 try:
@@ -1621,8 +1639,124 @@ def build_runtime_task_handlers(
             "source_write_attempted": False,
         }
 
+    def daily_intelligence_digest(context: TaskContext) -> dict[str, object]:
+        """Push the recent new-posting digest to every configured group bot.
+
+        Configuration lives in ``config/notify.yaml``.  Without that file the
+        task reports ``disabled`` and sends nothing: the workbench view keeps
+        working, so a missing push config is not an error.
+        """
+
+        from packages.intelligence import (
+            NotifyConfigError,
+            build_daily_digest,
+            load_notify_config,
+            push_daily_digest,
+        )
+
+        notify_path = getattr(configured, "notify_config", None)
+        try:
+            config = load_notify_config(notify_path)
+        except NotifyConfigError as exc:
+            return {
+                "status": "configuration_invalid",
+                "reason": str(exc),
+                "pushed": 0,
+                "failed": 0,
+                "source_write_attempted": False,
+            }
+        event_storage = agent_storage or getattr(repo, "storage", None)
+        if event_storage is None:
+            return {
+                "status": "storage_unavailable",
+                "reason": "intelligence events need an Agent database",
+                "pushed": 0,
+                "failed": 0,
+                "source_write_attempted": False,
+            }
+        digest = build_daily_digest(event_storage, hours=config.digest_hours)
+        if not config.enabled:
+            return {
+                "status": "disabled",
+                "reason": "config/notify.yaml 未配置 webhooks；工作台视图不受影响",
+                "digest": digest.to_dict(),
+                "pushed": 0,
+                "failed": 0,
+                "source_write_attempted": False,
+            }
+        deliveries = push_daily_digest(digest, config)
+        pushed = sum(1 for delivery in deliveries if delivery.ok)
+        return {
+            "status": "pushed" if pushed else "delivery_failed",
+            "digest": digest.to_dict(),
+            "deliveries": [
+                {
+                    "target": delivery.target,
+                    "ok": delivery.ok,
+                    "status_code": delivery.status_code,
+                    "error": delivery.error,
+                    "payload_bytes": delivery.payload_bytes,
+                }
+                for delivery in deliveries
+            ],
+            "pushed": pushed,
+            "failed": len(deliveries) - pushed,
+            "source_write_attempted": False,
+        }
+
+    def offerbiu_announcements(context: TaskContext) -> dict[str, object]:
+        """Pull the newest OfferBiu announcements and store them as postings.
+
+        Incremental by design: only the first few pages per recruit type are
+        read, which is enough to catch new batches without re-walking 490 pages.
+        """
+
+        from packages.intelligence.offerbiu_source import (
+            OfferBiuError,
+            fetch_offerbiu_postings,
+            ingest_offerbiu_postings,
+        )
+
+        event_storage = agent_storage or getattr(repo, "storage", None)
+        if event_storage is None:
+            return {
+                "status": "storage_unavailable",
+                "reason": "announcement sync needs an Agent database",
+                "source_write_attempted": False,
+            }
+        if not context.write_enabled:
+            raise PermissionError("Agent database write is not authorized for this task")
+        pages = 10
+        try:
+            postings = fetch_offerbiu_postings(
+                recruit_types=("实习", "秋招", "春招"),
+                max_pages_per_type=pages,
+                delay_seconds=0.3,
+            )
+        except OfferBiuError as exc:
+            return {
+                "status": "source_failed",
+                "reason": str(exc),
+                "source_write_attempted": False,
+            }
+        result = ingest_offerbiu_postings(
+            event_storage, postings, run_id=context.run_id
+        )
+        payload = result.to_dict()
+        events = payload.get("events") or {}
+        baseline = events.get("baseline_companies") or []
+        if len(baseline) > 5:
+            events["baseline_companies"] = baseline[:5] + [f"...共 {len(baseline)} 家"]
+        return {
+            "status": "completed",
+            **payload,
+            "source_write_attempted": True,
+        }
+
     return {
         TaskType.DAILY_RECRUITMENT_INTELLIGENCE.value: daily_recruitment_intelligence,
+        TaskType.OFFERBIU_ANNOUNCEMENTS.value: offerbiu_announcements,
+        TaskType.DAILY_INTELLIGENCE_DIGEST.value: daily_intelligence_digest,
         TaskType.CRAWLER_HEALTH.value: crawler_health,
         TaskType.APPLICATION_PROGRESS.value: application_progress,
         TaskType.RECRUITMENT_MAILBOX.value: recruitment_mailbox,

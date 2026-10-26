@@ -336,7 +336,10 @@ async def app_lifespan(_app: FastAPI):
     recovered_runs = 0
     recovered_browser_operations = 0
     if database_url:
-        recovery_storage = Storage.from_url(database_url)
+        # Zero-config local start: a source checkout on the default SQLite URL
+        # has no tables yet.  create_all is idempotent and a no-op on the
+        # migrated PostgreSQL deployment, so startup can safely ensure them.
+        recovery_storage = Storage.from_url(database_url, initialize=True)
         try:
             recovered_runs = AgentStateStore(recovery_storage).recover_interrupted_task_runs()
             recovered_browser_operations = _recover_desktop_browser_operations(settings, recovery_storage)
@@ -403,6 +406,8 @@ app.include_router(configuration_router)
 from apps.api.resume_filler import router as resume_filler_router
 app.include_router(resume_filler_router)
 app.include_router(company_sources_router)
+from apps.api.intelligence import router as intelligence_router
+app.include_router(intelligence_router)
 
 
 @lru_cache(maxsize=1)

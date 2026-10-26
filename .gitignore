@@ -20,6 +20,9 @@ config/companies.yaml
 config/rag_sources.yaml
 config/companies.local.yaml
 config/rag_sources.local.yaml
+# Group-bot webhook URLs contain secrets; only notify.example.yaml is tracked.
+config/notify.yaml
+config/notify.local.yaml
 *.pem
 *.key
 *.p12
@@ -29,7 +32,12 @@ config/rag_sources.local.yaml
 .desktop-runtime-tests/
 artifacts/
 .data/
-data/
+# Local scrape output is not committed ...
+data/*
+# ... except the curated seed catalog, which is meant to ship with the repo so
+# a fresh clone starts with real postings (see data/seed/README.md).
+!data/seed/
+!data/seed/**
 outputs/
 reports/
 tmp/

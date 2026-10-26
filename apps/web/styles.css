@@ -5762,3 +5762,41 @@ h3 { font-size: 16px; }
 @media (max-width: 700px) { .configuration-status, .configuration-grid, .model-connection-grid, .configuration-industry-grid { grid-template-columns: minmax(0, 1fr); } .configuration-status > div { border-right: 0; border-bottom: 1px solid #d7e3f4; } .configuration-status > div:last-child { border-bottom: 0; } .configuration-section-heading { align-items: flex-start; flex-direction: column; } .crawl-report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .assistant-job-context { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-bottom: 8px; font-size: 12px; }
 #assistant-selected-job { max-width: 260px; overflow-wrap: anywhere; color: #34527b; }
+
+/* --- 岗位情报站：今日新发布 ------------------------------------------------ */
+.intelligence-company-list { display: grid; gap: 12px; margin-top: 20px; }
+.intelligence-company-list[data-state="empty"] { margin-top: 0; }
+.intelligence-company { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.intelligence-company-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px 18px; cursor: pointer; }
+.intelligence-company-summary h3 { margin: 0; font-size: 15px; color: var(--ink); }
+.intelligence-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.intelligence-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 12px; line-height: 18px; border: 1px solid transparent; }
+.intelligence-badge--new { color: var(--accent-ink); background: var(--success-soft); border-color: #c5e5dd; }
+.intelligence-badge--updated { color: #7a4a12; background: #fbf1e2; border-color: #ecd7b4; }
+.intelligence-badge--removed { color: #7d2f38; background: var(--danger-soft); border-color: #eccfd3; }
+.intelligence-items { list-style: none; margin: 0; padding: 0 18px 12px; display: grid; gap: 2px; }
+.intelligence-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.intelligence-kind { flex: 0 0 auto; margin-top: 1px; padding: 1px 7px; border-radius: 4px; font-size: 12px; line-height: 18px; border: 1px solid var(--line-strong); color: var(--ink-soft); background: var(--surface-subtle); }
+.intelligence-kind--new { color: var(--accent-ink); border-color: #c5e5dd; background: var(--success-soft); }
+.intelligence-kind--updated { color: #7a4a12; border-color: #ecd7b4; background: #fbf1e2; }
+.intelligence-kind--removed { color: #7d2f38; border-color: #eccfd3; background: var(--danger-soft); }
+.intelligence-item-main { min-width: 0; display: grid; gap: 2px; }
+.intelligence-title { color: var(--ink); font-size: 14px; text-decoration: none; overflow-wrap: anywhere; }
+a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underline; }
+.intelligence-meta { margin: 0; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; }
+.intelligence-time { color: var(--muted-light); }
+.intelligence-item--removed .intelligence-title { color: var(--muted); text-decoration: line-through; }
+@media (max-width: 700px) { .intelligence-company-summary { padding: 12px 14px; } .intelligence-items { padding: 0 14px 10px; } }
+
+/* --- 岗位情报站：覆盖统计条 ------------------------------------------------ */
+.coverage-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin: 16px 0 4px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-subtle); font-size: 13px; color: var(--ink-soft); }
+.coverage-strip[hidden] { display: none; }
+.coverage-strip strong { font-size: 17px; color: var(--accent-ink); margin-right: 2px; }
+.coverage-hint { color: var(--muted); font-size: 12px; }
+
+/* --- 岗位情报站：视图标签 -------------------------------------------------- */
+.intel-tabs { display: flex; gap: 4px; margin: 18px 0 4px; border-bottom: 1px solid var(--line); }
+.intel-tab { appearance: none; border: 0; background: none; padding: 9px 14px; font-size: 14px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.intel-tab:hover { color: var(--ink-soft); }
+.intel-tab.is-active { color: var(--accent-dark); border-bottom-color: var(--accent); font-weight: 500; }
+.intel-tab-count { font-size: 12px; color: var(--muted-light); margin-left: 4px; }

@@ -64,6 +64,8 @@ if ($TaskNamePrefix -notmatch '^[A-Za-z0-9._-]+$') {
 
 $taskIds = @(
     "daily_recruitment_intelligence"
+    "offerbiu_announcements"
+    "daily_intelligence_digest"
     "crawler_health"
     "application_progress"
     "recruitment_mailbox"

@@ -986,6 +986,38 @@ def _batch_value(raw: Mapping[str, Any]) -> str:
     }.get(normalized, normalized or RecruitmentBatch.UNKNOWN.value)
 
 
+_COHORT_TITLE_RE = re.compile(r"(20\d{2})\s*(?:届|年(?:应届)?毕业)")
+
+
+def _coerce_cohort_year(value: Any) -> int | None:
+    """Accept only a plausible graduation year.
+
+    Crawlers that do not model a cohort often emit ``0`` or ``""``.  ``0`` is
+    not a year and must not be stored as if it were evidence.
+    """
+
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        year = int(value)
+    except (TypeError, ValueError):
+        return None
+    return year if 2000 <= year <= 2100 else None
+
+
+def _cohort_from_title(title: str) -> tuple[int, str] | None:
+    """Return the cohort a posting states in its own title, plus the evidence.
+
+    ``【2027届秋招】后端开发`` is explicit evidence; a title that names no year
+    yields ``None`` so the row stays honestly unknown.
+    """
+
+    match = _COHORT_TITLE_RE.search(title or "")
+    if match is None:
+        return None
+    return int(match.group(1)), match.group(0)
+
+
 def _observed_job(company: PipelineCompany, raw_job: Any) -> tuple[ObservedCrawlerJob, dict[str, Any]]:
     raw = _as_mapping(raw_job)
     from packages.recruitment_core.offerbiu_policy import apply_offerbiu_cohort, is_offerbiu_source
@@ -1015,6 +1047,31 @@ def _observed_job(company: PipelineCompany, raw_job: Any) -> tuple[ObservedCrawl
             "batch": _batch_value(raw),
         }
     )
+    # Upstream only tags a row's track when it classifies as an internship,
+    # which leaves ordinary campus rows as 'unknown' and hides them from the
+    # track filters.  Batch is the reliable signal: a formal/early posting is a
+    # campus posting, an internship batch is an internship.
+    if not _text(normalized.get("track")):
+        normalized["track"] = {
+            "internship": "internship",
+            "formal": "campus",
+            "early": "campus",
+        }.get(normalized["batch"], "unknown")
+
+    # Normalise the cohort before it becomes a stored snapshot:
+    #   1. a non-year value (0 / "" / "unknown") means "no cohort evidence";
+    #   2. a title that spells out the year ("【2027届秋招】") *is* evidence and
+    #      may fill the gap, recorded with its source and the matched text.
+    cohort = _coerce_cohort_year(normalized.get("cohort"))
+    if cohort is None:
+        from_title = _cohort_from_title(normalized["title"])
+        if from_title is not None:
+            cohort, evidence = from_title
+            normalized["cohort_status"] = "confirmed"
+            normalized.setdefault("cohort_source", "title")
+            normalized.setdefault("cohort_evidence", evidence)
+    normalized["cohort"] = cohort
+
     observed = ObservedCrawlerJob(
         id=normalized["id"],
         title=normalized["title"],

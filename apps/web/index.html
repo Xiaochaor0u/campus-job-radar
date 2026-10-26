@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f7ff">
     <title>秋招工作台 | RecruitOps Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=public-ui-20260924-1">
-    <script defer src="./app.js?v=public-ui-20260924-1"></script>
-    <script defer src="./company-sources.js?v=public-ui-20260924-1"></script>
-    <script defer src="./configuration.js?v=public-ui-20260924-1"></script>
+    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261026-6">
+    <script defer src="./app.js?v=intel-ui-20261026-6"></script>
+    <script defer src="./company-sources.js?v=intel-ui-20261026-6"></script>
+    <script defer src="./configuration.js?v=intel-ui-20261026-6"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -24,6 +24,11 @@
         <nav class="primary-nav" aria-label="工作台导航">
           <button class="nav-item" type="button" data-view="configuration"><span class="nav-symbol" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 7h16M4 17h16"></path><circle cx="8" cy="7" r="3" fill="white"></circle><circle cx="16" cy="17" r="3" fill="white"></circle></svg></span><span>配置</span></button>
           <p class="nav-group-label">发现</p>
+          <button class="nav-item" type="button" data-view="intelligence">
+            <span class="nav-symbol" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6 7.7 7.7M16.3 16.3l2.1 2.1M18.4 5.6 16.3 7.7M7.7 16.3 5.6 18.4"></path><circle cx="12" cy="12" r="3.5"></circle></svg></span>
+            <span>今日新发布</span>
+            <span class="nav-count" id="nav-intelligence-count">—</span>
+          </button>
           <button class="nav-item is-active" type="button" data-view="jobs" data-job-nav-mode="all">
             <span class="nav-symbol" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></span>
             <span>27届校招</span>
@@ -246,6 +251,94 @@
                 <span>正在读取招聘数据与审批状态</span>
               </div>
             </section>
+          </section>
+
+          <section class="view-panel" id="intelligence-view" data-view-panel="intelligence" aria-labelledby="intelligence-heading" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">岗位情报站 / 定时采集</p>
+                <h2 id="intelligence-heading">今日新发布</h2>
+                <p class="section-description">定时采集各企业官网后，按「新增 / 变更 / 下架」列出岗位变化。首次采集只建立基线，从第二天起看到的都是真实的新发布。</p>
+              </div>
+              <div class="section-actions">
+                <label><span class="sr-only">统计窗口</span><select id="intelligence-window">
+                  <option value="24">最近 24 小时</option>
+                  <option value="72">最近 3 天</option>
+                  <option value="168">最近 7 天</option>
+                  <option value="720">最近 30 天</option>
+                </select></label>
+                <label><span class="sr-only">招聘类型</span><select id="intelligence-track">
+                  <option value="">全部类型</option>
+                  <option value="campus">校招</option>
+                  <option value="internship">实习</option>
+                </select></label>
+                <button class="icon-button" id="intelligence-refresh-button" type="button" aria-label="刷新岗位情报" title="刷新岗位情报"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.7-3.9L4 9M4 5v4h4M4 13a8 8 0 0 0 14.7 3.9L20 15M20 19v-4h-4"></path></svg></button>
+              </div>
+            </div>
+
+            <div class="source-note" role="note" aria-label="岗位情报来源">
+              <strong>怎么用</strong>
+              <span>岗位来自 <code>config/companies.yaml</code> 里配置的企业官网，由每日定时任务自动采集。想加企业就改这个文件；想让新岗位推到群里，配置 <code>config/notify.yaml</code> 后运行「岗位情报日报推送」任务。</span>
+            </div>
+
+            <div class="intel-tabs" role="tablist" aria-label="岗位情报视图">
+              <button class="intel-tab is-active" type="button" role="tab" data-intel-tab="changes" aria-selected="true">岗位变化</button>
+              <button class="intel-tab" type="button" role="tab" data-intel-tab="all" aria-selected="false">全部岗位 <span class="intel-tab-count" id="intel-all-count">—</span></button>
+            </div>
+
+            <div id="intel-changes-view">
+            <div class="coverage-strip" id="intelligence-coverage" hidden>
+              <span><strong id="coverage-total">—</strong> 个岗位已入库</span>
+              <span><strong id="coverage-active">—</strong> 个在招</span>
+              <span><strong id="coverage-campus">—</strong> 个可进 27 届校招视图</span>
+              <span class="coverage-hint">其余岗位标题未写明届别，仅在「今日新发布」可见</span>
+            </div>
+
+            <div class="metric-grid jobs-metric-grid" aria-label="岗位变化摘要">
+              <article class="metric-item"><div class="metric-label">新发布</div><strong class="metric-value" id="intelligence-total-new">—</strong><span class="metric-detail" id="intelligence-since-detail">最近 24 小时</span></article>
+              <article class="metric-item"><div class="metric-label">内容变更</div><strong class="metric-value" id="intelligence-total-updated">—</strong><span class="metric-detail">JD 或条件有更新</span></article>
+              <article class="metric-item"><div class="metric-label">已下架</div><strong class="metric-value" id="intelligence-total-removed">—</strong><span class="metric-detail">官网已不再展示</span></article>
+              <article class="metric-item"><div class="metric-label">有变化的企业</div><strong class="metric-value" id="intelligence-company-count">—</strong><span class="metric-detail">按企业分组</span></article>
+            </div>
+
+            <div class="empty-state" id="intelligence-empty" hidden>
+              <h3>还没有岗位变化记录</h3>
+              <p id="intelligence-empty-detail">首次运行采集时会建立基线快照，此时不会产生「新发布」事件。等下一次定时采集完成后，这里会列出真正新增的岗位。</p>
+              <p id="intelligence-empty-covered" hidden>本次采集已入库 <strong id="empty-coverage-count">—</strong> 个岗位（含 JD 正文），岗位变化从下一次采集开始记录。现在就可以先看已入库的岗位：</p>
+              <button class="button button--primary" id="intelligence-goto-jobs" type="button" hidden>去「27届校招」查看已入库岗位</button>
+            </div>
+
+            <div id="intelligence-companies" class="intelligence-company-list" data-state="loading">
+              <div class="loading-rows" aria-label="加载中"><span></span><span></span><span></span></div>
+            </div>
+            </div>
+
+            <div id="intel-all-view" hidden>
+              <form class="job-filter-bar" id="intel-job-filter">
+                <label><span class="sr-only">招聘类型</span><select id="intel-job-track">
+                  <option value="">校招 + 实习</option>
+                  <option value="campus">只看校招</option>
+                  <option value="internship">只看实习</option>
+                </select></label>
+                <label><span class="sr-only">数据来源</span><select id="intel-job-source">
+                  <option value="">全部来源</option>
+                  <option value="offerbiu">招聘公告（OfferBiu）</option>
+                  <option value="recruitops-agent.daily_pipeline">企业官网采集</option>
+                </select></label>
+                <label class="search-field" for="intel-job-keyword"><span class="sr-only">搜索</span><input id="intel-job-keyword" type="search" placeholder="搜索岗位、公司或城市" autocomplete="off"></label>
+                <button class="button button--primary" id="intel-job-apply" type="button">筛选</button>
+                <button class="button button--ghost" id="intel-job-reset" type="reset">重置</button>
+              </form>
+              <div class="table-scroll"><table class="data-table">
+                <thead><tr><th>公司</th><th>岗位</th><th>地点</th><th>类型</th><th>截止</th><th>来源</th></tr></thead>
+                <tbody id="intel-job-body"><tr><td colspan="6"><div class="loading-rows" aria-label="加载中"><span></span><span></span></div></td></tr></tbody>
+              </table></div>
+              <div class="pager">
+                <button class="button button--ghost" id="intel-job-prev" type="button">上一页</button>
+                <span id="intel-job-info">—</span>
+                <button class="button button--ghost" id="intel-job-next" type="button">下一页</button>
+              </div>
+            </div>
           </section>
 
           <section class="view-panel is-visible" id="jobs-view" data-view-panel="jobs" aria-labelledby="jobs-heading">

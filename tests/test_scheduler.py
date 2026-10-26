@@ -44,11 +44,13 @@ def _scheduler(tmp_path: Path, task: TaskDefinition | None = None) -> LocalTaskS
     return LocalTaskScheduler(tasks=tasks, lock_path=tmp_path / "scheduler.lock")
 
 
-def test_fixed_catalog_contains_four_read_only_daily_tasks() -> None:
+def test_fixed_catalog_contains_read_only_daily_tasks() -> None:
     definitions = default_task_definitions()
 
     assert set(definitions) == {
         TaskType.DAILY_RECRUITMENT_INTELLIGENCE.value,
+        TaskType.OFFERBIU_ANNOUNCEMENTS.value,
+        TaskType.DAILY_INTELLIGENCE_DIGEST.value,
         TaskType.CRAWLER_HEALTH.value,
         TaskType.APPLICATION_PROGRESS.value,
         TaskType.RECRUITMENT_MAILBOX.value,
@@ -56,15 +58,23 @@ def test_fixed_catalog_contains_four_read_only_daily_tasks() -> None:
     assert [definition.schedule.start_time for definition in definitions.values()] == [
         time(8, 0),
         time(8, 15),
+        time(9, 30),
+        time(8, 30),
         time(20, 0),
         time(9, 0),
     ]
     assert all(definition.read_only for definition in definitions.values())
+    # Only the two ingestion tasks may write into the Agent database.
+    writable = {
+        TaskType.DAILY_RECRUITMENT_INTELLIGENCE.value,
+        TaskType.OFFERBIU_ANNOUNCEMENTS.value,
+    }
     assert definitions[TaskType.DAILY_RECRUITMENT_INTELLIGENCE.value].agent_write_enabled is True
+    assert definitions[TaskType.OFFERBIU_ANNOUNCEMENTS.value].agent_write_enabled is True
     assert all(
         not definition.agent_write_enabled
         for task_id, definition in definitions.items()
-        if task_id != TaskType.DAILY_RECRUITMENT_INTELLIGENCE.value
+        if task_id not in writable
     )
 
 
@@ -347,7 +357,7 @@ def test_windows_task_install_and_uninstall_dry_runs_execute() -> None:
             timeout=15,
         )
         assert completed.returncode == 0, completed.stderr
-        assert completed.stdout.count("DRY-RUN schtasks.exe") == 4
+        assert completed.stdout.count("DRY-RUN schtasks.exe") == 6
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell service scripts are Windows-only")
@@ -361,6 +371,10 @@ def test_local_service_start_dry_run_executes_without_starting_a_process() -> No
             "-File",
             "scripts/start_local.ps1",
             "-DryRun",
+            # Point at the interpreter running the tests: the script otherwise
+            # insists on a project-local .venv, which a CI checkout may not have.
+            "-PythonExecutable",
+            sys.executable,
         ],
         cwd=ROOT,
         capture_output=True,

@@ -1,0 +1,35 @@
+# 群机器人推送配置示例。
+#
+# 复制为 config/notify.yaml 后按需修改。没有该文件时推送功能自动停用，
+# 本地工作台的「今日新发布」视图不受影响。
+#
+# 支持的目标类型：
+#   wecom     企业微信群机器人（群设置里添加机器人得到的 webhook 地址）
+#   dingtalk  钉钉群机器人（安全设置选"加签"时把密钥填到 secret）
+#   feishu    飞书群机器人（安全设置选"签名校验"时把密钥填到 secret）
+#   generic   通用 JSON POST，消息放在 "message" 字段；
+#             QQ 群机器人可经 OneBot 等自建桥接服务接入此类型。
+
+webhooks:
+  - name: 宿舍求职群
+    type: wecom
+    url: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=换成你的key
+
+  # - name: 班级钉钉群
+  #   type: dingtalk
+  #   url: https://oapi.dingtalk.com/robot/send?access_token=换成你的token
+  #   secret: SEC换成你的加签密钥
+
+  # - name: 飞书群
+  #   type: feishu
+  #   url: https://open.feishu.cn/open-apis/bot/v2/hook/换成你的hook
+  #   secret: 换成你的签名密钥
+
+  # - name: QQ群桥
+  #   type: generic
+  #   url: http://127.0.0.1:5700/send_group_msg
+
+# 日报统计窗口与每个企业每次推送最多展示的条数。
+digest:
+  hours: 24
+  max_items_per_push: 8

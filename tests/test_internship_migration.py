@@ -95,12 +95,16 @@ def test_migration_027_is_additive_only():
     assert "update job_snapshots" not in sql
 
 
-def test_migrations_are_contiguous_and_027_is_the_head():
+def test_migrations_are_contiguous_and_head_is_latest():
     versions = sorted(
         int(path.name.split("_", 1)[0]) for path in (ROOT / "migrations").glob("*.sql")
     )
 
-    assert versions == list(range(1, 28))
+    # 027 stays present and additive; 028 (job_events) is the new head added by
+    # the intelligence station.  The contract is "contiguous, no gaps", not
+    # "027 is always last".
+    assert versions == list(range(1, 29))
+    assert 27 in versions and 28 in versions
 
 
 # --- NULL / [] / non-empty -------------------------------------------------

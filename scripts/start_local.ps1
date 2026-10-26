@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [int]$Port = 8010,
+    [string]$PythonExecutable = "",
     [switch]$DryRun
 )
 
@@ -8,9 +9,14 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-$python = Join-Path $projectRoot ".venv\Scripts\python.exe"
+if ([string]::IsNullOrWhiteSpace($PythonExecutable)) {
+    $PythonExecutable = Join-Path $projectRoot ".venv\Scripts\python.exe"
+}
+$python = $PythonExecutable
 if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
-    throw "project virtual environment was not found: $python"
+    throw ("Python not found: {0}. Create a venv first " +
+        "(python -m venv .venv; .venv\Scripts\python.exe -m pip install -e '.[dev]'), " +
+        "or pass -PythonExecutable <path-to-python.exe>." -f $python)
 }
 if ($Port -lt 1 -or $Port -gt 65535) {
     throw "Port must be between 1 and 65535"

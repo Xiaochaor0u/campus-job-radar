@@ -6263,6 +6263,314 @@
     window.scrollTo(0, previous.scrollY);
   }
 
+  const INTELLIGENCE_EVENT_LABELS = { new: "新增", updated: "变更", removed: "下架" };
+  const INTELLIGENCE_TRACK_LABELS = { internship: "实习", campus: "校招", social: "社招", unknown: "" };
+
+  function intelligenceTimeLabel(value) {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "";
+    const minutes = Math.round((Date.now() - parsed.getTime()) / 60000);
+    if (minutes < 1) return "刚刚";
+    if (minutes < 60) return `${minutes} 分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    const days = Math.floor(hours / 24);
+    return days === 1 ? "昨天" : `${days} 天前`;
+  }
+
+  function renderIntelligenceBadge(type, count) {
+    const badge = document.createElement("span");
+    badge.className = `intelligence-badge intelligence-badge--${type}`;
+    badge.textContent = `${INTELLIGENCE_EVENT_LABELS[type] || type} ${count}`;
+    return badge;
+  }
+
+  function renderIntelligenceItem(item) {
+    const row = document.createElement("li");
+    row.className = `intelligence-item intelligence-item--${item.event_type}`;
+
+    const kind = document.createElement("span");
+    kind.className = `intelligence-kind intelligence-kind--${item.event_type}`;
+    kind.textContent = INTELLIGENCE_EVENT_LABELS[item.event_type] || item.event_type;
+    row.appendChild(kind);
+
+    const main = document.createElement("div");
+    main.className = "intelligence-item-main";
+
+    if (item.detail_url) {
+      const link = document.createElement("a");
+      link.className = "intelligence-title";
+      link.href = item.detail_url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = text(item.title);
+      main.appendChild(link);
+    } else {
+      const title = document.createElement("span");
+      title.className = "intelligence-title";
+      title.textContent = text(item.title);
+      main.appendChild(title);
+    }
+
+    const meta = document.createElement("p");
+    meta.className = "intelligence-meta";
+    const bits = [item.city, INTELLIGENCE_TRACK_LABELS[item.track]].filter(Boolean);
+    if (bits.length) meta.textContent = bits.join(" · ");
+    const when = intelligenceTimeLabel(item.detected_at);
+    if (when) {
+      const time = document.createElement("span");
+      time.className = "intelligence-time";
+      time.textContent = when;
+      meta.appendChild(time);
+    }
+    if (meta.textContent || when) main.appendChild(meta);
+    row.appendChild(main);
+    return row;
+  }
+
+  function renderIntelligenceCompany(company) {
+    const group = document.createElement("details");
+    group.className = "intelligence-company";
+    group.open = true;
+
+    const summary = document.createElement("summary");
+    summary.className = "intelligence-company-summary";
+    const name = document.createElement("h3");
+    name.textContent = text(company.company_name);
+    summary.appendChild(name);
+    const badges = document.createElement("span");
+    badges.className = "intelligence-badges";
+    if (company.new_count) badges.appendChild(renderIntelligenceBadge("new", company.new_count));
+    if (company.updated_count) badges.appendChild(renderIntelligenceBadge("updated", company.updated_count));
+    if (company.removed_count) badges.appendChild(renderIntelligenceBadge("removed", company.removed_count));
+    summary.appendChild(badges);
+    group.appendChild(summary);
+
+    const list = document.createElement("ul");
+    list.className = "intelligence-items";
+    for (const item of company.items || []) list.appendChild(renderIntelligenceItem(item));
+    group.appendChild(list);
+    return group;
+  }
+
+  async function loadIntelligence({ silent = false } = {}) {
+    const list = $("intelligence-companies");
+    if (!list) return;
+    const hours = Number($("intelligence-window")?.value || 24);
+    const track = $("intelligence-track")?.value || "";
+    if (!silent) list.dataset.state = "loading";
+    try {
+      const params = new URLSearchParams({ hours: String(hours) });
+      if (track) params.set("track", track);
+      const [digest, coverage] = await Promise.all([
+        api(`/api/intelligence/digest?${params.toString()}`),
+        api("/api/intelligence/coverage").catch(() => null),
+      ]);
+      if (coverage) {
+        const strip = $("intelligence-coverage");
+        if (strip) strip.hidden = false;
+        setText("coverage-total", text(coverage.total_jobs, "0"));
+        setText("coverage-active", text(coverage.active_jobs, "0"));
+        setText("coverage-campus", text(coverage.campus_ready_jobs, "0"));
+      }
+      setText("intelligence-total-new", text(digest?.total_new, "0"));
+      setText("intelligence-total-updated", text(digest?.total_updated, "0"));
+      setText("intelligence-total-removed", text(digest?.total_removed, "0"));
+      setText("intelligence-company-count", text((digest?.companies || []).length, "0"));
+      setText(
+        "intelligence-since-detail",
+        hours === 24 ? "最近 24 小时" : `最近 ${Number(digest?.hours || hours).toLocaleString("zh-CN")} 小时`,
+      );
+      const emptyNode = $("intelligence-empty");
+      if (emptyNode) emptyNode.hidden = !digest?.empty;
+      if (digest?.empty) {
+        // First crawl only builds a baseline; point the user at what did land.
+        const total = Number(coverage?.total_jobs || 0);
+        const covered = $("intelligence-empty-covered");
+        const gotoButton = $("intelligence-goto-jobs");
+        if (total > 0) {
+          setText("empty-coverage-count", text(total, "0"));
+          if (covered) covered.hidden = false;
+          if (gotoButton) gotoButton.hidden = false;
+        } else {
+          if (covered) covered.hidden = true;
+          if (gotoButton) gotoButton.hidden = true;
+        }
+      }
+      list.replaceChildren();
+      for (const company of digest?.companies || []) {
+        list.appendChild(renderIntelligenceCompany(company));
+      }
+      list.dataset.state = digest?.empty ? "empty" : "ready";
+      setText("nav-intelligence-count", text(digest?.total_new, "0"));
+    } catch (error) {
+      list.dataset.state = "error";
+      list.replaceChildren();
+      const note = document.createElement("p");
+      note.className = "muted-label";
+      note.textContent = `岗位情报加载失败：${error.message}`;
+      list.appendChild(note);
+      if (!silent) showToast(`岗位情报加载失败：${error.message}`, "error");
+    }
+  }
+
+  const INTEL_JOB_TRACK_LABELS = { campus: "校招", internship: "实习", social: "社招", unknown: "—" };
+  const INTEL_SOURCE_LABELS = { offerbiu: "招聘公告", "recruitops-agent.daily_pipeline": "官网采集" };
+  let intelJobPage = 1;
+  let intelJobsLoaded = false;
+
+  function intelCompanyLabel(companyId) {
+    return String(companyId || "").replace(/^offerbiu:/, "");
+  }
+
+  function renderIntelJobRow(item) {
+    const row = document.createElement("tr");
+
+    const companyCell = document.createElement("td");
+    companyCell.textContent = intelCompanyLabel(item.company_id);
+    row.appendChild(companyCell);
+
+    const titleCell = document.createElement("td");
+    if (item.detail_url) {
+      const link = document.createElement("a");
+      link.href = item.detail_url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = text(item.title);
+      titleCell.appendChild(link);
+    } else {
+      titleCell.textContent = text(item.title);
+    }
+    row.appendChild(titleCell);
+
+    const cityCell = document.createElement("td");
+    cityCell.textContent = text(item.city);
+    row.appendChild(cityCell);
+
+    const trackCell = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = `intelligence-kind intelligence-kind--${item.track === "internship" ? "new" : "updated"}`;
+    badge.textContent = INTEL_JOB_TRACK_LABELS[item.track] || item.track || "—";
+    trackCell.appendChild(badge);
+    row.appendChild(trackCell);
+
+    const deadlineCell = document.createElement("td");
+    deadlineCell.textContent = text(item.deadline_text);
+    row.appendChild(deadlineCell);
+
+    const sourceCell = document.createElement("td");
+    sourceCell.textContent = INTEL_SOURCE_LABELS[item.source] || text(item.source);
+    row.appendChild(sourceCell);
+
+    return row;
+  }
+
+  async function loadIntelligenceJobs(page = 1) {
+    const body = $("intel-job-body");
+    if (!body) return;
+    intelJobPage = Math.max(1, page);
+    const params = new URLSearchParams({ page: String(intelJobPage), page_size: "30" });
+    const track = $("intel-job-track")?.value || "";
+    const source = $("intel-job-source")?.value || "";
+    const keyword = $("intel-job-keyword")?.value?.trim() || "";
+    if (track) params.set("track", track);
+    if (source) params.set("source", source);
+    if (keyword) params.set("keyword", keyword);
+    body.replaceChildren();
+    const loading = document.createElement("tr");
+    const loadingCell = document.createElement("td");
+    loadingCell.colSpan = 6;
+    loadingCell.textContent = "加载中…";
+    loading.appendChild(loadingCell);
+    body.appendChild(loading);
+    try {
+      const payload = await api(`/api/intelligence/jobs?${params.toString()}`);
+      body.replaceChildren();
+      const items = payload?.items || [];
+      if (!items.length) {
+        const emptyRow = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 6;
+        cell.textContent = "没有匹配的岗位";
+        emptyRow.appendChild(cell);
+        body.appendChild(emptyRow);
+      } else {
+        for (const item of items) body.appendChild(renderIntelJobRow(item));
+      }
+      setText("intel-all-count", Number(payload?.total || 0).toLocaleString("zh-CN"));
+      setText("intel-job-info", `第 ${payload?.page || 1} / ${payload?.pages || 1} 页 · 共 ${Number(payload?.total || 0).toLocaleString("zh-CN")} 条`);
+      const prev = $("intel-job-prev");
+      const next = $("intel-job-next");
+      if (prev) prev.disabled = intelJobPage <= 1;
+      if (next) next.disabled = intelJobPage >= (payload?.pages || 1);
+      intelJobsLoaded = true;
+    } catch (error) {
+      body.replaceChildren();
+      const errorRow = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 6;
+      cell.textContent = `加载失败：${error.message}`;
+      errorRow.appendChild(cell);
+      body.appendChild(errorRow);
+    }
+  }
+
+  function switchIntelTab(tab) {
+    const changes = $("intel-changes-view");
+    const all = $("intel-all-view");
+    if (changes) changes.hidden = tab !== "changes";
+    if (all) all.hidden = tab !== "all";
+    document.querySelectorAll("[data-intel-tab]").forEach((button) => {
+      const active = button.dataset.intelTab === tab;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    if (tab === "all" && !intelJobsLoaded) void loadIntelligenceJobs(1);
+  }
+
+  async function primeNavCounts() {
+    // The internship badge used to be written only by renderJobStats(), which
+    // runs when that view loads — so the sidebar showed "—" until the user
+    // clicked it. Fetch the count once at startup instead.
+    if (state.jobBrowse.internshipTotal !== null && state.jobBrowse.internshipTotal !== undefined) return;
+    try {
+      const payload = await api("/api/jobs/browse?limit=1&offset=0&track=internship");
+      const total = payload?.total ?? payload?.stats?.jobs;
+      if (total !== null && total !== undefined) {
+        state.jobBrowse.internshipTotal = total;
+        setText("nav-internship-count", total);
+      }
+    } catch (_) {
+      /* Leave the placeholder; the badge refreshes when the view opens. */
+    }
+  }
+
+  function bindIntelligenceControls() {
+    $("intelligence-refresh-button")?.addEventListener("click", () => void loadIntelligence());
+    $("intelligence-window")?.addEventListener("change", () => void loadIntelligence());
+    $("intelligence-track")?.addEventListener("change", () => void loadIntelligence());
+    $("intelligence-goto-jobs")?.addEventListener("click", () => {
+      const navButton = document.querySelector('[data-view="jobs"][data-job-nav-mode="all"]');
+      if (navButton) navButton.click(); else switchView("jobs");
+    });
+    document.querySelectorAll("[data-intel-tab]").forEach((button) => {
+      button.addEventListener("click", () => switchIntelTab(button.dataset.intelTab));
+    });
+    $("intel-job-apply")?.addEventListener("click", () => void loadIntelligenceJobs(1));
+    $("intel-job-track")?.addEventListener("change", () => void loadIntelligenceJobs(1));
+    $("intel-job-source")?.addEventListener("change", () => void loadIntelligenceJobs(1));
+    $("intel-job-filter")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void loadIntelligenceJobs(1);
+    });
+    $("intel-job-filter")?.addEventListener("reset", () => {
+      window.setTimeout(() => void loadIntelligenceJobs(1), 0);
+    });
+    $("intel-job-prev")?.addEventListener("click", () => void loadIntelligenceJobs(intelJobPage - 1));
+    $("intel-job-next")?.addEventListener("click", () => void loadIntelligenceJobs(intelJobPage + 1));
+  }
+
   function switchView(view) {
     if (activeView && activeView !== view) viewScroll.set(activeView, window.scrollY);
     const changed = activeView !== view;
@@ -6278,6 +6586,7 @@
     });
     const titles = {
       dashboard: ["工作台 / 今日", "今日工作台"],
+      intelligence: ["岗位情报站 / 定时采集", "今日新发布"],
       assistant: ["任务入口", "求职助理"],
       jobs: ["岗位 / 2027 届", state.jobBrowse.mode === "today" ? "今日新增" : "27届校招"],
       companies: ["来源与岗位覆盖", "公司"],
@@ -6296,6 +6605,7 @@
     $("sidebar")?.classList.remove("is-open"); $("mobile-menu-button")?.setAttribute("aria-expanded", "false");
     if (changed) window.scrollTo(0, viewScroll.get(view) || 0);
     if (changed && view === "schedule") void loadFullSchedule();
+    if (changed && view === "intelligence") void loadIntelligence();
     if (changed && view === "applications") { void loadApplications({ useCache: true }); void loadApplicationIdentityQueue(); }
     if (view === "assistant") void refreshDailyProgress();
   }
@@ -6738,6 +7048,7 @@
     refreshDailyProgress,
     refreshConversationList,
     deleteConversation,
+    loadIntelligence,
     state,
   };
   if (globalThis.__RECRUITOPS_TEST_MODE__) {
@@ -6748,7 +7059,12 @@
       const savedView = sessionStorage.getItem("recruitops.activeView");
       if ([...document.querySelectorAll("[data-view-panel]")].some(panel => panel.dataset.viewPanel === savedView)) initialView = savedView;
     } catch (_) { /* Start at jobs when storage is unavailable. */ }
-    bind(); switchView(initialView); updateIntentHint(); renderConversation(); renderTaskHistory(); renderDashboardTodos(); loadCore();
+    // ?view=intelligence opens the change feed directly (bookmarkable).
+    const requestedView = new URLSearchParams(window.location.search).get("view");
+    if (requestedView && [...document.querySelectorAll("[data-view-panel]")].some(panel => panel.dataset.viewPanel === requestedView)) initialView = requestedView;
+    bind(); bindIntelligenceControls(); switchView(initialView); updateIntentHint(); renderConversation(); renderTaskHistory(); renderDashboardTodos(); loadCore();
+    void primeNavCounts();
+    if (initialView !== "intelligence") void loadIntelligence({ silent: true });
     window.setInterval(() => { if (activeView === "assistant" || hasPendingDailyNotices()) void refreshDailyProgress(); }, 5000);
     window.setInterval(() => { if (activeView === "assistant") void refreshConversationList({ quiet: true }); }, 5000);
   }

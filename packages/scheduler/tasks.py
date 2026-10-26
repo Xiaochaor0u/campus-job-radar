@@ -14,6 +14,8 @@ class TaskType(str, Enum):
     """Stable task identifiers shared by the runner and Windows scripts."""
 
     DAILY_RECRUITMENT_INTELLIGENCE = "daily_recruitment_intelligence"
+    OFFERBIU_ANNOUNCEMENTS = "offerbiu_announcements"
+    DAILY_INTELLIGENCE_DIGEST = "daily_intelligence_digest"
     CRAWLER_HEALTH = "crawler_health"
     APPLICATION_PROGRESS = "application_progress"
     RECRUITMENT_MAILBOX = "recruitment_mailbox"
@@ -38,6 +40,22 @@ def default_task_definitions() -> dict[str, TaskDefinition]:
             task_id=TaskType.CRAWLER_HEALTH.value,
             label="本地爬虫健康检查",
             schedule=DailySchedule(time(8, 15)),
+        ),
+        TaskType.DAILY_INTELLIGENCE_DIGEST.value: TaskDefinition(
+            task_id=TaskType.DAILY_INTELLIGENCE_DIGEST.value,
+            label="岗位情报日报推送",
+            schedule=DailySchedule(time(9, 30)),
+            timeout_seconds=600.0,
+            max_retries=0,
+        ),
+        TaskType.OFFERBIU_ANNOUNCEMENTS.value: TaskDefinition(
+            task_id=TaskType.OFFERBIU_ANNOUNCEMENTS.value,
+            label="招聘公告增量同步",
+            schedule=DailySchedule(time(8, 30)),
+            timeout_seconds=900.0,
+            max_retries=1,
+            # Writes job/company snapshots into the Agent database.
+            agent_write_enabled=True,
         ),
         TaskType.APPLICATION_PROGRESS.value: TaskDefinition(
             task_id=TaskType.APPLICATION_PROGRESS.value,
