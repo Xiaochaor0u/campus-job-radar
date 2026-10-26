@@ -224,6 +224,25 @@ def intelligence_recommend(
     return result.to_dict()
 
 
+@router.post("/job-insight")
+def intelligence_job_insight(payload: dict[str, Any]) -> dict[str, Any]:
+    """Profile one posting on demand: stated bar, salary wording, peer context.
+
+    On-demand by design. Salary wording exists in well under 1% of the stored
+    announcements, so pre-computing this for every row would spend model calls
+    on rows that have nothing to read.
+    """
+
+    from packages.intelligence.insight import build_job_insight
+
+    job_id = str(payload.get("job_id") or "").strip()
+    if not job_id:
+        raise HTTPException(422, "job_id 不能为空")
+    use_model = payload.get("use_model", True) is not False
+    result = build_job_insight(_storage(), job_id, use_model=use_model)
+    return result.to_dict()
+
+
 @router.post("/resume-extract")
 def intelligence_resume_extract(payload: dict[str, Any]) -> dict[str, Any]:
     """Turn pasted resume text into profile keywords without a model call.

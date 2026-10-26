@@ -6424,6 +6424,115 @@
     return String(companyId || "").replace(/^offerbiu:/, "");
   }
 
+  // --- 岗位画像：点一条岗位再分析，不预先算全库 ---------------------------
+  const INTEL_BAR_TONE = { "要求偏高": "high", "要求中等": "mid", "要求较低": "low", "信息不足": "unknown" };
+
+  function insightNode(tag, className, textContent) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (textContent !== undefined) node.textContent = textContent;
+    return node;
+  }
+
+  function renderInsightBody(data) {
+    const wrap = document.createDocumentFragment();
+    const head = insightNode("div", "intel-insight-head");
+    head.append(insightNode("strong", "", "岗位画像"));
+    head.append(insightNode("span", `intel-bar intel-bar--${INTEL_BAR_TONE[data.bar?.level] || "unknown"}`, text(data.bar?.level)));
+    wrap.append(head);
+
+    if (data.found === false) {
+      wrap.append(insightNode("p", "intel-insight-note", data.message || "没有找到这个岗位。"));
+      return wrap;
+    }
+
+    const facts = insightNode("div", "intel-insight-facts");
+    const fact = (label, value, tone) => {
+      const box = insightNode("div", "intel-insight-fact");
+      box.append(insightNode("span", "", label));
+      box.append(insightNode("strong", tone ? `is-${tone}` : "", value));
+      return box;
+    };
+    facts.append(fact("薪资（公告原文）", data.salary?.found ? data.salary.text : "公告未披露", data.salary?.found ? "" : "muted"));
+    facts.append(fact("同公司在库岗位", text(data.peer?.company_jobs, "0")));
+    facts.append(fact("同方向岗位", text(data.peer?.same_direction_jobs, "0")));
+    if (data.job?.deadline_text) facts.append(fact("截止", data.job.deadline_text));
+    wrap.append(facts);
+
+    if (data.salary?.found && data.salary.evidence) {
+      wrap.append(insightNode("p", "intel-insight-evidence", `薪资原文：${data.salary.evidence}`));
+    }
+
+    const requirements = data.requirements || [];
+    if (requirements.length) {
+      const list = insightNode("ul", "intel-insight-reqs");
+      for (const item of requirements) {
+        const row = document.createElement("li");
+        row.append(insightNode("span", "intel-insight-req-label", item.label));
+        row.append(insightNode("span", "intel-insight-req-value", item.value));
+        if (item.evidence) row.append(insightNode("span", "intel-insight-req-evidence", item.evidence));
+        list.append(row);
+      }
+      wrap.append(list);
+    } else {
+      wrap.append(insightNode("p", "intel-insight-note", "这条公告没有写明学历、院校或经验要求，没有可引用的门槛信息。"));
+    }
+
+    const reasons = data.bar?.reasons || [];
+    if (reasons.length) wrap.append(insightNode("p", "intel-insight-reasons", `判定依据：${reasons.join("；")}`));
+
+    if (data.comment) {
+      const box = insightNode("div", "intel-insight-comment");
+      box.append(insightNode("span", "intel-insight-comment-label", "模型解读"));
+      box.append(insightNode("p", "", data.comment));
+      wrap.append(box);
+    } else if (data.comment_status === "disabled") {
+      wrap.append(insightNode("p", "intel-insight-note", "未启用模型，只显示从公告里抽到的事实。"));
+    } else if (data.comment_status && data.comment_status !== "ok") {
+      wrap.append(insightNode("p", "intel-insight-note", "模型解读这次没生成（可能是配额或网络），上面的事实仍然有效。"));
+    }
+
+    wrap.append(insightNode("p", "intel-insight-disclaimer", data.disclaimer || ""));
+    return wrap;
+  }
+
+  function closeJobInsight() {
+    document.querySelectorAll(".intel-insight-row").forEach(node => node.remove());
+  }
+
+  async function toggleJobInsight(anchor, jobId, asRow) {
+    const existing = anchor.nextElementSibling;
+    if (existing && existing.classList.contains("intel-insight-row")) { existing.remove(); return; }
+    closeJobInsight();
+    const holder = document.createElement(asRow ? "tr" : "div");
+    holder.className = "intel-insight-row";
+    const cell = document.createElement(asRow ? "td" : "div");
+    if (asRow) cell.colSpan = 7;
+    const panel = insightNode("div", "intel-insight", "正在读取公告并分析…");
+    cell.appendChild(panel);
+    holder.appendChild(cell);
+    anchor.after(holder);
+    try {
+      const data = await api("/api/intelligence/job-insight", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId }),
+      });
+      panel.replaceChildren(renderInsightBody(data));
+    } catch (error) {
+      panel.replaceChildren(insightNode("p", "intel-insight-note", `分析失败：${error.message}`));
+    }
+  }
+
+  function insightButton(label, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button--ghost intel-insight-toggle";
+    button.textContent = label;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
   function renderIntelJobRow(item) {
     const row = document.createElement("tr");
 
@@ -6463,6 +6572,11 @@
     sourceCell.textContent = INTEL_SOURCE_LABELS[item.source] || text(item.source);
     row.appendChild(sourceCell);
 
+    const insightCell = document.createElement("td");
+    insightCell.className = "intel-insight-col";
+    insightCell.appendChild(insightButton("分析", () => void toggleJobInsight(row, item.id, true)));
+    row.appendChild(insightCell);
+
     return row;
   }
 
@@ -6480,7 +6594,7 @@
     body.replaceChildren();
     const loading = document.createElement("tr");
     const loadingCell = document.createElement("td");
-    loadingCell.colSpan = 6;
+    loadingCell.colSpan = 7;
     loadingCell.textContent = "加载中…";
     loading.appendChild(loadingCell);
     body.appendChild(loading);
@@ -6491,7 +6605,7 @@
       if (!items.length) {
         const emptyRow = document.createElement("tr");
         const cell = document.createElement("td");
-        cell.colSpan = 6;
+        cell.colSpan = 7;
         cell.textContent = "没有匹配的岗位";
         emptyRow.appendChild(cell);
         body.appendChild(emptyRow);
@@ -6509,7 +6623,7 @@
       body.replaceChildren();
       const errorRow = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 6;
+      cell.colSpan = 7;
       cell.textContent = `加载失败：${error.message}`;
       errorRow.appendChild(cell);
       body.appendChild(errorRow);
@@ -6550,6 +6664,11 @@
     main.appendChild(meta);
 
     row.appendChild(main);
+
+    const actions = document.createElement("div");
+    actions.className = "intel-rec-actions";
+    actions.appendChild(insightButton("画像", () => void toggleJobInsight(row, item.job_id, false)));
+    row.appendChild(actions);
     return row;
   }
 

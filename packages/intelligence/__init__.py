@@ -19,6 +19,7 @@ from .offerbiu_source import (
     ingest_offerbiu_postings,
 )
 from .recommend import RecommendationItem, RecommendationResult, recommend_jobs
+from .insight import JobInsight, build_job_insight
 from .resume_keywords import extract_profile_hints
 from .watch import (
     VALID_WINDOWS,
@@ -46,6 +47,7 @@ from .webhook import (
 __all__ = [
     "DigestResult",
     "EventWriteResult",
+    "JobInsight",
     "NotifyConfig",
     "NotifyConfigError",
     "OfferBiuError",
@@ -58,6 +60,7 @@ __all__ = [
     "WatchHit",
     "WatchResult",
     "build_daily_digest",
+    "build_job_insight",
     "delete_rule",
     "expand_terms",
     "extract_profile_hints",
