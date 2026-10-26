@@ -6538,6 +6538,12 @@
 
     const companyCell = document.createElement("td");
     companyCell.textContent = intelCompanyLabel(item.company_id);
+    if (item.company_nature) {
+      const nature = document.createElement("span");
+      nature.className = `company-nature company-nature--${item.company_nature}`;
+      nature.textContent = item.company_nature;
+      companyCell.appendChild(nature);
+    }
     row.appendChild(companyCell);
 
     const titleCell = document.createElement("td");

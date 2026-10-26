@@ -1,0 +1,59 @@
+# 企业性质标注（人工整理，仅供参考，可自行修改）
+#
+# 用途：在「公司」和「全部岗位」里显示企业性质，帮你判断这是国企、民营还是外资。
+# 说明：
+#   * 这里的判据是「控股背景」的粗略归类，不是工商登记信息。混合所有制、国资参股
+#     但由民营团队经营的公司，不同口径会给出不同答案，本文件只给一个粗标签。
+#   * 招聘公告自带 companyNature 的（约 44%），优先用公告口径，本文件只用于补缺。
+#   * 键既支持企业 id（与 companies.yaml 对齐），也支持公司名。
+#
+# 可选值：民营 / 国资 / 外资 / 合资 / 其他
+companies:
+  tencent: 民营
+  tencent-internship: 民营
+  tencent-music: 民营
+  alibaba: 民营
+  bytedance: 民营
+  meituan: 民营
+  jd: 民营
+  pdd: 民营
+  baidu: 民营
+  baidu-internship: 民营
+  kuaishou: 民营
+  bilibili: 民营
+  netease: 民营
+  netease-leihuo: 民营
+  mihoyo: 民营
+  duoyi: 民营
+  gbits: 民营
+  ourpalm: 民营
+  "4399": 民营
+  xiaomi: 民营
+  oppo: 民营
+  lenovo: 民营
+  fanruan: 民营
+  tonghuashun: 民营
+  chaitin: 民营
+  huawei: 民营
+  dji: 民营
+  hikvision: 国资      # 中电海康集团控股
+  inovance: 民营
+  unitree: 民营
+  byd: 民营
+  lixiang: 民营
+  sf: 民营
+  boe: 国资            # 北京国资背景
+  cvte: 民营
+  tplink: 民营
+  isoftstone: 民营
+  zmotion: 民营
+  transsion: 民营
+  dahua: 民营
+  iflytek: 民营
+  h3c: 国资            # 紫光集团体系，国资背景
+  beike: 民营
+  huolala: 民营
+  zhihu: 民营
+  vip: 民营
+  dewu: 民营
+  xiaopeng: 民营

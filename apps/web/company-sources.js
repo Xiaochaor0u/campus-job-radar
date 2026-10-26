@@ -492,7 +492,15 @@
         const row = document.createElement("tr"); row.dataset.companySourceId = record.id || "";
         const company = document.createElement("button"); company.type = "button"; company.className = "text-button";
         company.dataset.companySourceDetail = record.id || ""; company.textContent = valueOrUnknown(record.company_name);
-        const identity = document.createElement("div"); identity.append(company); cellText(row, identity);
+        const identity = document.createElement("div"); identity.append(company);
+        if (record.nature) {
+          const nature = document.createElement("span");
+          nature.className = `company-nature company-nature--${record.nature}`;
+          nature.textContent = record.nature;
+          nature.title = "企业性质为人工粗分类，仅供参考";
+          identity.append(nature);
+        }
+        cellText(row, identity);
         const status = document.createElement("span"); status.className = `company-source-status company-source-status--${record.status || "unknown"}`; status.textContent = sourceStatusLabel(record.status); cellText(row, status);
         cellText(row, `${valueOrUnknown(record.job_count)} / ${valueOrUnknown(record.jd_pending_count)}`);
         const timeCell = cellText(row, localTime(record.last_attempt_at)); timeCell.title = record.last_attempt_at || "尚无记录";

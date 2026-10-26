@@ -68,3 +68,6 @@ user-data-dir/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 企业性质标注是模板的一部分，需要随仓库分发
+!config/company_nature.yaml

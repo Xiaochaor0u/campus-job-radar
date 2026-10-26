@@ -265,6 +265,12 @@ class Settings(BaseSettings):
         return self.agent_root / "config" / "companies.yaml"
 
     @property
+    def company_nature_config(self) -> Path:
+        """Hand-curated ownership labels; missing file only means no labels."""
+
+        return self.agent_root / "config" / "company_nature.yaml"
+
+    @property
     def notify_config(self) -> Path:
         """Group-bot push configuration; missing file means push disabled."""
 

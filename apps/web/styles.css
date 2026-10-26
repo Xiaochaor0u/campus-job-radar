@@ -5853,3 +5853,10 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
 .intel-insight-disclaimer { margin: 0; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted-light); font-size: 12px; line-height: 1.6; }
 .intel-rec-actions { display: flex; align-items: center; margin-left: auto; }
 @media (max-width: 700px) { .intel-insight-reqs li { grid-template-columns: 1fr; } .intel-insight-req-evidence { grid-column: 1; } }
+
+/* --- 企业性质标签 --------------------------------------------------------- */
+.company-nature { display: inline-flex; align-items: center; margin-left: 6px; padding: 0 6px; border-radius: 4px; font-size: 11px; line-height: 16px; border: 1px solid var(--line-strong); color: var(--muted); background: var(--surface-subtle); vertical-align: middle; }
+.company-nature--民营 { color: #2f5d8a; border-color: #cfdcea; background: #eef4fa; }
+.company-nature--国资 { color: #7d2f38; border-color: #eccfd3; background: #fdeff1; }
+.company-nature--外资 { color: #4a3a7a; border-color: #d8d0ea; background: #f3f0fa; }
+.company-nature--合资 { color: #7a4a12; border-color: #ecd7b4; background: #fbf1e2; }

@@ -41,6 +41,40 @@ def _registry() -> CompanySourceRegistry:
     return CompanySourceRegistry(Storage.from_url(get_settings().database_url))
 
 
+def _nature_map() -> dict[str, str]:
+    """Curated labels, re-read when the file changes (it is meant to be edited)."""
+
+    from packages.intelligence.company_nature import load_nature_map
+
+    path = get_settings().company_nature_config
+    try:
+        stamp = path.stat().st_mtime
+    except OSError:
+        return {}
+    cached = _NATURE_CACHE.get("value")
+    if cached and cached[0] == (str(path), stamp):
+        return cached[1]
+    mapping = load_nature_map(path)
+    _NATURE_CACHE["value"] = ((str(path), stamp), mapping)
+    return mapping
+
+
+_NATURE_CACHE: dict[str, Any] = {}
+
+
+def _with_nature(payload: dict[str, Any]) -> dict[str, Any]:
+    from packages.intelligence.company_nature import resolve_nature
+
+    mapping = _nature_map()
+    for item in payload.get("items") or []:
+        item["nature"] = resolve_nature(
+            mapping,
+            company_id=item.get("company_id"),
+            company_name=item.get("company_name"),
+        )
+    return payload
+
+
 def _require_local_write(request: Request) -> None:
     if not local_ui_request.get() or not is_local_ui(request):
         raise HTTPException(status_code=403, detail="Local same-origin UI request required")
@@ -64,7 +98,9 @@ def list_company_sources(
 ) -> dict[str, Any]:
     if status is not None and status not in SOURCE_STATUSES - {"unusable"}:
         raise HTTPException(status_code=422, detail="Unsupported source status")
-    return _registry().list_sources(page=page, page_size=page_size, q=q, status=status)
+    return _with_nature(
+        _registry().list_sources(page=page, page_size=page_size, q=q, status=status)
+    )
 
 
 @router.get("/{record_id}")
@@ -72,6 +108,13 @@ def get_company_source(record_id: str) -> dict[str, Any]:
     record = _registry().get_source(record_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Company source not found")
+    from packages.intelligence.company_nature import resolve_nature
+
+    record["nature"] = resolve_nature(
+        _nature_map(),
+        company_id=record.get("company_id"),
+        company_name=record.get("company_name"),
+    )
     return record
 
 

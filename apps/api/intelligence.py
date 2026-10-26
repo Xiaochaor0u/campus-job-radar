@@ -118,7 +118,10 @@ def intelligence_jobs(
 
     from sqlalchemy import func, or_, select
 
+    from packages.intelligence.company_nature import load_nature_map, resolve_nature
     from packages.storage import JobSnapshot
+
+    nature_map = load_nature_map(get_settings().company_nature_config)
 
     conditions = [JobSnapshot.availability_status == "active"]
     if track:
@@ -182,6 +185,11 @@ def intelligence_jobs(
                 "deadline_text": (row.capture_evidence or {}).get("deadline_text", ""),
                 "recruit_type": (row.capture_evidence or {}).get("recruit_type", ""),
                 "industry": (row.capture_evidence or {}).get("industry", ""),
+                "company_nature": resolve_nature(
+                    nature_map,
+                    company_id=row.company_id,
+                    raw_nature=(row.capture_evidence or {}).get("company_nature"),
+                ),
             }
             for row in rows
         ],
