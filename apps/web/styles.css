@@ -5813,3 +5813,11 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
 .intel-resume-hint-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
 .intel-chip { display: inline-flex; padding: 2px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-strong); color: var(--ink-soft); font-size: 12px; }
 .intel-recommend-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* --- 岗位情报站：每日新增 / 订阅 ------------------------------------------ */
+.intel-watch-rules { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 12px; }
+.intel-watch-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-soft); font-size: 13px; cursor: pointer; }
+.intel-watch-chip:hover { border-color: var(--accent); color: var(--accent-dark); }
+.intel-watch-chip.is-active { border-color: var(--accent); background: var(--surface-teal); color: var(--accent-ink); }
+.intel-watch-chip-remove { font-size: 14px; line-height: 1; color: var(--muted-light); padding: 0 2px; }
+.intel-watch-chip-remove:hover { color: var(--danger); }

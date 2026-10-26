@@ -6694,13 +6694,218 @@
     }
   }
 
+  let intelWatchLoaded = false;
+  let intelWatchActiveRule = "";
+
+  function watchFormValues() {
+    return {
+      keywords: $("intel-watch-keywords")?.value?.trim() || "",
+      directions: $("intel-watch-directions")?.value?.trim() || "",
+      cities: $("intel-watch-cities")?.value?.trim() || "",
+      track: $("intel-watch-track")?.value || "",
+      window: $("intel-watch-window")?.value || "today",
+      name: $("intel-watch-name")?.value?.trim() || "",
+    };
+  }
+
+  function fillWatchForm(rule) {
+    if (!rule) return;
+    if ($("intel-watch-keywords")) $("intel-watch-keywords").value = (rule.keywords || []).join(", ");
+    if ($("intel-watch-directions")) $("intel-watch-directions").value = (rule.directions || []).join(", ");
+    if ($("intel-watch-cities")) $("intel-watch-cities").value = (rule.cities || []).join(", ");
+    if ($("intel-watch-track")) $("intel-watch-track").value = rule.track || "";
+    if ($("intel-watch-name")) $("intel-watch-name").value = rule.name || "";
+  }
+
+  function renderWatchRules(rules) {
+    const box = $("intel-watch-rules");
+    if (!box) return;
+    box.replaceChildren();
+    if (!rules?.length) {
+      const hint = document.createElement("span");
+      hint.className = "muted-label";
+      hint.textContent = "还没有保存的订阅。填好条件后点「保存为订阅」，下次直接点它就行。";
+      box.appendChild(hint);
+      return;
+    }
+    for (const rule of rules) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "intel-watch-chip";
+      if (rule.id === intelWatchActiveRule) chip.classList.add("is-active");
+      chip.dataset.ruleId = rule.id;
+      const label = document.createElement("span");
+      label.textContent = rule.name;
+      chip.appendChild(label);
+      const remove = document.createElement("span");
+      remove.className = "intel-watch-chip-remove";
+      remove.textContent = "×";
+      remove.title = "删除这个订阅";
+      remove.addEventListener("click", (event) => {
+        event.stopPropagation();
+        void deleteWatchRule(rule.id);
+      });
+      chip.appendChild(remove);
+      chip.addEventListener("click", () => {
+        intelWatchActiveRule = rule.id;
+        fillWatchForm(rule);
+        renderWatchRules(rules);
+        void runWatch({ ruleId: rule.id });
+      });
+      box.appendChild(chip);
+    }
+  }
+
+  async function loadWatchMeta() {
+    try {
+      const payload = await api("/api/intelligence/watch/meta");
+      renderWatchRules(payload?.rules || []);
+      const latest = payload?.latest_event_at ? new Date(payload.latest_event_at) : null;
+      if (latest && !Number.isNaN(latest.getTime())) {
+        const minutes = Math.round((Date.now() - latest.getTime()) / 60000);
+        const ago = minutes < 1 ? "刚刚" : minutes < 60 ? `${minutes} 分钟前` : `${Math.floor(minutes / 60)} 小时前`;
+        setText("watch-freshness", `数据最后更新：${ago}`);
+      } else {
+        setText("watch-freshness", "还没有采集记录");
+      }
+      intelWatchLoaded = true;
+      return payload;
+    } catch (error) {
+      setText("watch-freshness", `订阅信息加载失败：${error.message}`);
+      return null;
+    }
+  }
+
+  function renderWatchHit(hit) {
+    const row = document.createElement("li");
+    row.className = "intelligence-item";
+    if (hit.track === "internship") row.classList.add("intelligence-item--new");
+
+    const kind = document.createElement("span");
+    kind.className = "intelligence-kind intelligence-kind--new";
+    kind.textContent = "新增";
+    row.appendChild(kind);
+
+    const main = document.createElement("div");
+    main.className = "intelligence-item-main";
+    const title = hit.detail_url ? document.createElement("a") : document.createElement("span");
+    title.className = "intelligence-title intel-recommend-title";
+    title.textContent = `${text(hit.company_name)} · ${text(hit.title)}`;
+    if (hit.detail_url) {
+      title.href = hit.detail_url;
+      title.target = "_blank";
+      title.rel = "noopener noreferrer";
+    }
+    main.appendChild(title);
+
+    const meta = document.createElement("p");
+    meta.className = "intelligence-meta";
+    const when = intelligenceTimeLabel(hit.detected_at);
+    const bits = [hit.city, INTEL_JOB_TRACK_LABELS[hit.track], when].filter(Boolean);
+    meta.textContent = bits.join(" · ");
+    main.appendChild(meta);
+    row.appendChild(main);
+    return row;
+  }
+
+  async function runWatch({ ruleId = "" } = {}) {
+    const list = $("intel-watch-list");
+    if (!list) return;
+    const values = watchFormValues();
+    const params = new URLSearchParams({ window: values.window, limit: "150" });
+    if (ruleId) {
+      params.set("rule_id", ruleId);
+    } else {
+      for (const key of ["keywords", "directions", "cities", "track"]) {
+        if (values[key]) params.set(key, values[key]);
+      }
+    }
+    list.replaceChildren();
+    const loading = document.createElement("div");
+    loading.className = "loading-rows";
+    for (let index = 0; index < 2; index += 1) loading.appendChild(document.createElement("span"));
+    list.appendChild(loading);
+    try {
+      const payload = await api(`/api/intelligence/watch/run?${params.toString()}`);
+      const summary = $("intel-watch-summary");
+      if (summary) summary.hidden = false;
+      setText("watch-hit-count", Number(payload?.total_hits || 0).toLocaleString("zh-CN"));
+      setText("watch-scanned", Number(payload?.scanned_events || 0).toLocaleString("zh-CN"));
+      const empty = $("intel-watch-empty");
+      const hits = payload?.hits || [];
+      if (empty) empty.hidden = hits.length > 0;
+      if (!hits.length) {
+        setText(
+          "intel-watch-empty-detail",
+          payload?.scanned_events
+            ? `窗口内有 ${payload.scanned_events} 条新增记录，但没有符合当前条件的。可以放宽城市或换个关键词。`
+            : "这个窗口内还没有新增记录。等下一次定时采集跑完再来看，或者先把时间窗口切到「最近 7 天」。",
+        );
+      }
+      list.replaceChildren();
+      for (const hit of hits) list.appendChild(renderWatchHit(hit));
+      list.dataset.state = hits.length ? "ready" : "empty";
+    } catch (error) {
+      list.replaceChildren();
+      const note = document.createElement("p");
+      note.className = "muted-label";
+      note.textContent = `筛选失败：${error.message}`;
+      list.appendChild(note);
+    }
+  }
+
+  async function saveWatchRule() {
+    const values = watchFormValues();
+    const name = values.name || [values.keywords, values.directions, values.cities, values.track]
+      .filter(Boolean)
+      .join(" ")
+      .slice(0, 30);
+    if (!name) {
+      showToast("先填一个条件，或给订阅起个名字", "error");
+      return;
+    }
+    try {
+      const payload = await api("/api/intelligence/watch/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          keywords: values.keywords ? values.keywords.split(/[,，]/).map((part) => part.trim()).filter(Boolean) : [],
+          directions: values.directions ? values.directions.split(/[,，]/).map((part) => part.trim()).filter(Boolean) : [],
+          cities: values.cities ? values.cities.split(/[,，]/).map((part) => part.trim()).filter(Boolean) : [],
+          track: values.track,
+        }),
+      });
+      intelWatchActiveRule = payload?.rule?.id || "";
+      if ($("intel-watch-name")) $("intel-watch-name").value = payload?.rule?.name || name;
+      showToast(`已保存订阅「${payload?.rule?.name || name}」`);
+      await loadWatchMeta();
+      await runWatch({ ruleId: intelWatchActiveRule });
+    } catch (error) {
+      showToast(`保存失败：${error.message}`, "error");
+    }
+  }
+
+  async function deleteWatchRule(ruleId) {
+    try {
+      await api(`/api/intelligence/watch/rules/${encodeURIComponent(ruleId)}`, { method: "DELETE" });
+      if (intelWatchActiveRule === ruleId) intelWatchActiveRule = "";
+      showToast("订阅已删除");
+      await loadWatchMeta();
+    } catch (error) {
+      showToast(`删除失败：${error.message}`, "error");
+    }
+  }
+
   function switchIntelTab(tab) {
     const changes = $("intel-changes-view");
     const all = $("intel-all-view");
     const recommend = $("intel-recommend-view");
+    const watch = $("intel-watch-view");
     if (changes) changes.hidden = tab !== "changes";
     if (all) all.hidden = tab !== "all";
     if (recommend) recommend.hidden = tab !== "recommend";
+    if (watch) watch.hidden = tab !== "watch";
     document.querySelectorAll("[data-intel-tab]").forEach((button) => {
       const active = button.dataset.intelTab === tab;
       button.classList.toggle("is-active", active);
@@ -6708,6 +6913,16 @@
     });
     if (tab === "all" && !intelJobsLoaded) void loadIntelligenceJobs(1);
     if (tab === "recommend" && !intelRecLoaded) void loadRecommendations();
+    if (tab === "watch") {
+      if (!intelWatchLoaded) void loadWatchMeta().then((payload) => {
+        const first = payload?.rules?.[0];
+        if (first) {
+          intelWatchActiveRule = first.id;
+          fillWatchForm(first);
+          void runWatch({ ruleId: first.id });
+        }
+      });
+    }
   }
 
   async function primeNavCounts() {
@@ -6759,6 +6974,19 @@
     });
     $("intel-resume-analyze")?.addEventListener("click", () => void analyzeResumeText());
     $("intel-resume-save")?.addEventListener("click", () => void saveResumeHints());
+    $("intel-watch-run")?.addEventListener("click", () => {
+      intelWatchActiveRule = "";
+      void runWatch();
+    });
+    $("intel-watch-save")?.addEventListener("click", () => void saveWatchRule());
+    $("intel-watch-window")?.addEventListener("change", () => {
+      void runWatch({ ruleId: intelWatchActiveRule });
+    });
+    $("intel-watch-form")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      intelWatchActiveRule = "";
+      void runWatch();
+    });
   }
 
   function switchView(view) {

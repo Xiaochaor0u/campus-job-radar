@@ -20,6 +20,19 @@ from .offerbiu_source import (
 )
 from .recommend import RecommendationItem, RecommendationResult, recommend_jobs
 from .resume_keywords import extract_profile_hints
+from .watch import (
+    VALID_WINDOWS,
+    WatchCondition,
+    WatchHit,
+    WatchResult,
+    delete_rule,
+    expand_terms,
+    latest_event_at,
+    list_rules,
+    run_watch,
+    save_rule,
+    window_start,
+)
 from .webhook import (
     NotifyConfig,
     NotifyConfigError,
@@ -40,14 +53,25 @@ __all__ = [
     "RecommendationItem",
     "RecommendationResult",
     "WebhookDelivery",
+    "VALID_WINDOWS",
+    "WatchCondition",
+    "WatchHit",
+    "WatchResult",
     "build_daily_digest",
+    "delete_rule",
+    "expand_terms",
     "extract_profile_hints",
     "fetch_offerbiu_postings",
     "format_digest_text",
     "ingest_offerbiu_postings",
+    "latest_event_at",
+    "list_rules",
     "load_notify_config",
     "push_daily_digest",
     "recommend_jobs",
     "record_pipeline_events",
+    "run_watch",
+    "save_rule",
     "send_webhook_message",
+    "window_start",
 ]

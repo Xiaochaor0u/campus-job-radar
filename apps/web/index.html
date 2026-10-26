@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f7ff">
     <title>秋招工作台 | RecruitOps Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261026-10">
-    <script defer src="./app.js?v=intel-ui-20261026-10"></script>
-    <script defer src="./company-sources.js?v=intel-ui-20261026-10"></script>
-    <script defer src="./configuration.js?v=intel-ui-20261026-10"></script>
+    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261026-11">
+    <script defer src="./app.js?v=intel-ui-20261026-11"></script>
+    <script defer src="./company-sources.js?v=intel-ui-20261026-11"></script>
+    <script defer src="./configuration.js?v=intel-ui-20261026-11"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -285,6 +285,7 @@
               <button class="intel-tab is-active" type="button" role="tab" data-intel-tab="changes" aria-selected="true">岗位变化</button>
               <button class="intel-tab" type="button" role="tab" data-intel-tab="all" aria-selected="false">全部岗位 <span class="intel-tab-count" id="intel-all-count">—</span></button>
               <button class="intel-tab" type="button" role="tab" data-intel-tab="recommend" aria-selected="false">智能推荐</button>
+              <button class="intel-tab" type="button" role="tab" data-intel-tab="watch" aria-selected="false">每日新增</button>
             </div>
 
             <div id="intel-changes-view">
@@ -380,6 +381,43 @@
               <div id="intel-rec-list" class="intelligence-company-list" data-state="loading">
                 <div class="loading-rows" aria-label="加载中"><span></span><span></span><span></span></div>
               </div>
+            </div>
+
+            <div id="intel-watch-view" hidden>
+              <div class="intel-watch-rules" id="intel-watch-rules"></div>
+
+              <form class="job-filter-bar" id="intel-watch-form">
+                <label class="search-field" for="intel-watch-keywords"><span class="sr-only">关键词</span><input id="intel-watch-keywords" type="search" placeholder="关键词：算法, 大模型" autocomplete="off"></label>
+                <label class="search-field" for="intel-watch-directions"><span class="sr-only">岗位方向</span><input id="intel-watch-directions" type="search" placeholder="方向：算法工程师, 后端" autocomplete="off"></label>
+                <label class="search-field" for="intel-watch-cities"><span class="sr-only">城市</span><input id="intel-watch-cities" type="search" placeholder="城市：北京, 上海" autocomplete="off"></label>
+                <label><span class="sr-only">招聘类型</span><select id="intel-watch-track">
+                  <option value="">校招 + 实习</option>
+                  <option value="campus">只看校招</option>
+                  <option value="internship">只看实习</option>
+                </select></label>
+                <label><span class="sr-only">时间窗口</span><select id="intel-watch-window">
+                  <option value="today">今天新增</option>
+                  <option value="3d">最近 3 天</option>
+                  <option value="7d">最近 7 天</option>
+                  <option value="30d">最近 30 天</option>
+                </select></label>
+                <label class="search-field" for="intel-watch-name"><span class="sr-only">订阅名称</span><input id="intel-watch-name" type="text" placeholder="订阅名称（可选，填了就保存）" autocomplete="off"></label>
+                <button class="button button--primary" id="intel-watch-run" type="button">筛选新增岗位</button>
+                <button class="button button--ghost" id="intel-watch-save" type="button">保存为订阅</button>
+              </form>
+
+              <div class="coverage-strip" id="intel-watch-summary" hidden>
+                <span><strong id="watch-hit-count">—</strong> 个命中</span>
+                <span>共扫描 <strong id="watch-scanned">—</strong> 条新增记录</span>
+                <span class="coverage-hint" id="watch-freshness">—</span>
+              </div>
+
+              <div class="empty-state" id="intel-watch-empty" hidden>
+                <h3>还没有命中</h3>
+                <p id="intel-watch-empty-detail">填一个关键词或方向再点「筛选新增岗位」。订阅只在本地保存，不会上传。</p>
+              </div>
+
+              <div id="intel-watch-list" class="intelligence-company-list"></div>
             </div>
           </section>
 

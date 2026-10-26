@@ -322,6 +322,127 @@ def intelligence_profile_save(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+@router.get("/watch/meta")
+def watch_meta() -> dict[str, Any]:
+    """Rules plus data freshness — the page needs both to be honest."""
+
+    from packages.intelligence.watch import VALID_WINDOWS, latest_event_at, list_rules
+
+    rules = list_rules(_storage())
+    return {
+        "windows": list(VALID_WINDOWS),
+        "latest_event_at": latest_event_at(_storage()),
+        "rules": [
+            {
+                "id": row.id,
+                "name": row.name,
+                "keywords": row.keywords or [],
+                "directions": row.directions or [],
+                "cities": row.cities or [],
+                "track": row.track or "",
+                "enabled": bool(row.enabled),
+            }
+            for row in rules
+        ],
+    }
+
+
+@router.post("/watch/rules")
+def watch_save_rule(payload: dict[str, Any]) -> dict[str, Any]:
+    from packages.intelligence.watch import WatchCondition, save_rule
+
+    condition = WatchCondition.from_mapping(payload)
+    try:
+        row = save_rule(
+            _storage(),
+            condition,
+            name=str(payload.get("name") or ""),
+            rule_id=str(payload["id"]) if payload.get("id") else None,
+            enabled=bool(payload.get("enabled", True)),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "saved": True,
+        "rule": {
+            "id": row.id,
+            "name": row.name,
+            "keywords": row.keywords or [],
+            "directions": row.directions or [],
+            "cities": row.cities or [],
+            "track": row.track or "",
+            "enabled": bool(row.enabled),
+        },
+    }
+
+
+@router.delete("/watch/rules/{rule_id}")
+def watch_delete_rule(rule_id: str) -> dict[str, Any]:
+    from packages.intelligence.watch import delete_rule
+
+    if not delete_rule(_storage(), rule_id):
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    return {"deleted": True, "id": rule_id}
+
+
+@router.get("/watch/run")
+def watch_run(
+    rule_id: str | None = Query(default=None, max_length=64),
+    window: str = Query(default="today", max_length=8),
+    keywords: str | None = Query(default=None, max_length=200),
+    directions: str | None = Query(default=None, max_length=200),
+    cities: str | None = Query(default=None, max_length=200),
+    track: str | None = Query(default=None, max_length=32),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> dict[str, Any]:
+    """Run one saved rule, or an ad-hoc condition when no rule_id is given."""
+
+    from packages.intelligence.watch import (
+        VALID_WINDOWS,
+        WatchCondition,
+        list_rules,
+        run_watch,
+    )
+
+    normalized_window = (window or "today").strip().casefold()
+    if normalized_window not in VALID_WINDOWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"window 只能是：{', '.join(VALID_WINDOWS)}",
+        )
+
+    storage = _storage()
+    rule_name = ""
+    if rule_id:
+        rule = next((row for row in list_rules(storage) if row.id == rule_id), None)
+        if rule is None:
+            raise HTTPException(status_code=404, detail="订阅不存在")
+        condition = WatchCondition.from_mapping(rule)
+        rule_name = rule.name
+    else:
+        condition = WatchCondition(
+            keywords=tuple(part for part in (keywords or "").replace("，", ",").split(",") if part.strip()),
+            directions=tuple(part for part in (directions or "").replace("，", ",").split(",") if part.strip()),
+            cities=tuple(part for part in (cities or "").replace("，", ",").split(",") if part.strip()),
+            track=(track or "").strip().casefold(),
+        )
+        if condition.empty:
+            raise HTTPException(
+                status_code=400,
+                detail="请至少提供一个筛选条件（关键词 / 方向 / 城市 / 类型）",
+            )
+
+    result = run_watch(
+        storage,
+        condition,
+        window=normalized_window,
+        limit=limit,
+        rule_id=rule_id,
+        rule_name=rule_name,
+    )
+    return result.to_dict()
+
+
 @router.get("/coverage")
 def intelligence_coverage() -> dict[str, Any]:
     """How many postings are actually stored, per company and cohort state.

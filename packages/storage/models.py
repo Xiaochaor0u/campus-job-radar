@@ -819,6 +819,45 @@ class JobEvent(Base):
 JobEventRecord = JobEvent
 
 
+class WatchRule(Base):
+    """A saved filter for "what is new today".
+
+    Conditions inside one rule are AND-ed; values inside one field are OR-ed.
+    Empty lists mean "no constraint on this dimension", which keeps a rule like
+    "只看实习" expressible without pretending it constrains keywords.
+    """
+
+    __tablename__ = "watch_rules"
+    __table_args__ = (
+        Index("ix_watch_rules_enabled", "enabled"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    keywords: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    directions: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    cities: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    track: Mapped[str] = mapped_column(
+        String(32), default="", server_default="", nullable=False
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+WatchRuleRecord = WatchRule
+
+
 __all__ = [
     "AutomationExecution",
     "AutomationExecutionRecord",
@@ -855,6 +894,8 @@ __all__ = [
     "JobEvent",
     "JobEventRecord",
     "JOB_EVENT_TYPES",
+    "WatchRule",
+    "WatchRuleRecord",
     "JobSnapshot",
     "JobSnapshotRecord",
     "ScheduleEventSnapshot",
