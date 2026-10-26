@@ -8,6 +8,7 @@ configured group bot would push, without sending anything.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -184,6 +185,140 @@ def intelligence_jobs(
             }
             for row in rows
         ],
+    }
+
+
+@router.get("/recommend")
+def intelligence_recommend(
+    limit: int = Query(default=30, ge=1, le=200),
+    min_score: int = Query(default=1, ge=0, le=100),
+    track: str | None = Query(default=None, max_length=32),
+    company_id: str | None = Query(default=None, max_length=255),
+) -> dict[str, Any]:
+    """Rank every stored posting against the candidate profile.
+
+    Deterministic and offline: no model call, no key required.  The profile
+    itself comes from the 配置 page (resume upload writes it).
+    """
+
+    from packages.candidate_profile.loader import (
+        CandidateProfileError,
+        load_candidate_profile,
+    )
+    from packages.intelligence.recommend import recommend_jobs
+
+    settings = get_settings()
+    try:
+        profile = load_candidate_profile(settings.candidate_profile_config)
+    except (CandidateProfileError, OSError, ValueError):
+        profile = {}
+
+    result = recommend_jobs(
+        _storage(),
+        profile,
+        limit=limit,
+        min_score=min_score,
+        track=track or None,
+        company_id=company_id or None,
+    )
+    return result.to_dict()
+
+
+@router.post("/resume-extract")
+def intelligence_resume_extract(payload: dict[str, Any]) -> dict[str, Any]:
+    """Turn pasted resume text into profile keywords without a model call.
+
+    Fallback for users who have no API key: the 配置 page's parser needs a
+    model, this one only needs a word list.  Results are suggestions the user
+    reviews before saving.
+    """
+
+    text = str(payload.get("text") or "").strip()
+    if len(text) < 20:
+        raise HTTPException(status_code=400, detail="简历内容太短，至少需要 20 个字符")
+    if len(text) > 200_000:
+        raise HTTPException(status_code=400, detail="简历内容过长，请截取主要部分")
+    from packages.intelligence.resume_keywords import extract_profile_hints
+
+    return extract_profile_hints(text)
+
+
+@router.post("/profile-save")
+def intelligence_profile_save(payload: dict[str, Any]) -> dict[str, Any]:
+    """Persist recommendation preferences into the candidate profile.
+
+    Only the fields this endpoint owns are replaced; everything else already in
+    the profile (project evidence, excluded keywords, …) is preserved.  This is
+    the key-free path: paste a resume, accept the extracted words, save.
+    """
+
+    import yaml
+
+    settings = get_settings()
+    path = Path(settings.candidate_profile_config)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    document: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            if isinstance(loaded, dict):
+                document = loaded
+        except (OSError, UnicodeError, yaml.YAMLError) as exc:
+            raise HTTPException(status_code=400, detail=f"现有简历配置无法读取：{exc}") from exc
+
+    profile = document.get("profile")
+    if not isinstance(profile, dict):
+        profile = {}
+    matching = profile.get("matching")
+    if not isinstance(matching, dict):
+        matching = {}
+
+    def _clean_list(value: Any, limit: int = 40) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        result: list[str] = []
+        for item in value:
+            text = " ".join(str(item or "").split())
+            if text and text not in result:
+                result.append(text[:60])
+        return result[:limit]
+
+    if "skills" in payload:
+        profile["skills"] = _clean_list(payload.get("skills"))
+    if "degree" in payload:
+        degree = str(payload.get("degree") or "").strip()
+        if degree:
+            profile["degree"] = degree
+    if "job_type" in payload:
+        job_type = str(payload.get("job_type") or "").strip()
+        if job_type in {"campus", "internship"}:
+            profile["job_type"] = job_type
+    if "title_keywords" in payload:
+        matching["title_keywords"] = _clean_list(payload.get("title_keywords"))
+    if "primary_directions" in payload:
+        matching["primary_directions"] = _clean_list(payload.get("primary_directions"))
+    matching.setdefault("direction_policy", "parallel")
+
+    profile["matching"] = matching
+    document["profile"] = profile
+
+    try:
+        path.write_text(
+            yaml.safe_dump(document, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"写入简历配置失败：{exc}") from exc
+
+    return {
+        "saved": True,
+        "path": str(path),
+        "skills": profile.get("skills") or [],
+        "title_keywords": matching.get("title_keywords") or [],
+        "primary_directions": matching.get("primary_directions") or [],
+        "degree": profile.get("degree") or "",
+        "job_type": profile.get("job_type") or "",
     }
 
 

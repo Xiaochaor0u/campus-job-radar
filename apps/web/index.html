@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f7ff">
     <title>秋招工作台 | RecruitOps Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261026-6">
-    <script defer src="./app.js?v=intel-ui-20261026-6"></script>
-    <script defer src="./company-sources.js?v=intel-ui-20261026-6"></script>
-    <script defer src="./configuration.js?v=intel-ui-20261026-6"></script>
+    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261026-9">
+    <script defer src="./app.js?v=intel-ui-20261026-9"></script>
+    <script defer src="./company-sources.js?v=intel-ui-20261026-9"></script>
+    <script defer src="./configuration.js?v=intel-ui-20261026-9"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -284,6 +284,7 @@
             <div class="intel-tabs" role="tablist" aria-label="岗位情报视图">
               <button class="intel-tab is-active" type="button" role="tab" data-intel-tab="changes" aria-selected="true">岗位变化</button>
               <button class="intel-tab" type="button" role="tab" data-intel-tab="all" aria-selected="false">全部岗位 <span class="intel-tab-count" id="intel-all-count">—</span></button>
+              <button class="intel-tab" type="button" role="tab" data-intel-tab="recommend" aria-selected="false">智能推荐</button>
             </div>
 
             <div id="intel-changes-view">
@@ -337,6 +338,47 @@
                 <button class="button button--ghost" id="intel-job-prev" type="button">上一页</button>
                 <span id="intel-job-info">—</span>
                 <button class="button button--ghost" id="intel-job-next" type="button">下一页</button>
+              </div>
+            </div>
+
+            <div id="intel-recommend-view" hidden>
+              <div class="source-note" role="note" aria-label="智能推荐说明">
+                <strong>怎么打分</strong>
+                <span id="intel-rec-meta">按你在「配置」页填写的简历偏好，对全部已收录岗位做方向 / 关键词 / 技能三项匹配，分数越高越贴合。不需要模型密钥。</span>
+              </div>
+              <div class="job-filter-bar" id="intel-rec-filter">
+                <label><span class="sr-only">最低分数</span><select id="intel-rec-score">
+                  <option value="1">全部分数</option>
+                  <option value="40">40 分以上</option>
+                  <option value="60" selected>60 分以上</option>
+                  <option value="80">80 分以上</option>
+                </select></label>
+                <label><span class="sr-only">招聘类型</span><select id="intel-rec-track">
+                  <option value="">校招 + 实习</option>
+                  <option value="campus">只看校招</option>
+                  <option value="internship">只看实习</option>
+                </select></label>
+                <button class="button button--primary" id="intel-rec-refresh" type="button">重新计算</button>
+                <button class="button button--ghost" id="intel-rec-goto-config" type="button">去配置简历</button>
+              </div>
+              <div class="empty-state" id="intel-rec-empty" hidden>
+                <h3>还没有足够的信息做推荐</h3>
+                <p id="intel-rec-empty-detail">先到「配置」页上传简历（或手动填写岗位关键词与目标方向），保存后回到这里就能看到按匹配度排序的岗位。</p>
+              </div>
+
+              <details class="intel-resume-box" id="intel-resume-box">
+                <summary>没有模型密钥？把简历内容粘贴到这里（纯本地关键词提取）</summary>
+                <p class="muted-label">只做规则匹配，不联网、不调用模型。提取结果是建议，保存前你可以自己删改。</p>
+                <textarea id="intel-resume-text" rows="7" placeholder="把简历里的「教育背景 / 技能 / 项目 / 实习经历」粘贴进来，例如：&#10;某某大学 计算机科学与技术 硕士，2027 届&#10;熟悉 Python、PyTorch，做过大模型 RAG 项目"></textarea>
+                <div class="intel-resume-actions">
+                  <button class="button button--primary" id="intel-resume-analyze" type="button">提取关键词</button>
+                  <button class="button button--ghost" id="intel-resume-save" type="button" disabled>保存并推荐</button>
+                  <span class="muted-label" id="intel-resume-status"></span>
+                </div>
+                <div id="intel-resume-hints" class="intel-resume-hints" hidden></div>
+              </details>
+              <div id="intel-rec-list" class="intelligence-company-list" data-state="loading">
+                <div class="loading-rows" aria-label="加载中"><span></span><span></span><span></span></div>
               </div>
             </div>
           </section>

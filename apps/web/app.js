@@ -6516,17 +6516,198 @@
     }
   }
 
+  let intelRecLoaded = false;
+
+  function renderRecommendationRow(item) {
+    const row = document.createElement("li");
+    row.className = "intelligence-item";
+    if (item.track === "internship") row.classList.add("intelligence-item--new");
+
+    const score = document.createElement("span");
+    score.className = "intel-score";
+    score.textContent = String(item.score);
+    score.title = `匹配分 ${item.score} / 100`;
+    row.appendChild(score);
+
+    const main = document.createElement("div");
+    main.className = "intelligence-item-main";
+
+    const title = item.detail_url ? document.createElement("a") : document.createElement("span");
+    title.className = "intelligence-title intel-recommend-title";
+    title.textContent = `${text(item.company_name)} · ${text(item.title)}`;
+    if (item.title && item.title.length > 80) title.title = item.title;
+    if (item.detail_url) {
+      title.href = item.detail_url;
+      title.target = "_blank";
+      title.rel = "noopener noreferrer";
+    }
+    main.appendChild(title);
+
+    const meta = document.createElement("p");
+    meta.className = "intelligence-meta";
+    const bits = [item.city, INTEL_JOB_TRACK_LABELS[item.track], ...(item.reasons || [])].filter(Boolean);
+    meta.textContent = bits.join(" · ");
+    main.appendChild(meta);
+
+    row.appendChild(main);
+    return row;
+  }
+
+  async function loadRecommendations() {
+    const list = $("intel-rec-list");
+    if (!list) return;
+    const minScore = Number($("intel-rec-score")?.value || 60);
+    const track = $("intel-rec-track")?.value || "";
+    const params = new URLSearchParams({ limit: "60", min_score: String(minScore) });
+    if (track) params.set("track", track);
+    list.dataset.state = "loading";
+    list.replaceChildren();
+    const loading = document.createElement("div");
+    loading.className = "loading-rows";
+    for (let index = 0; index < 3; index += 1) loading.appendChild(document.createElement("span"));
+    list.appendChild(loading);
+    try {
+      const payload = await api(`/api/intelligence/recommend?${params.toString()}`);
+      const empty = $("intel-rec-empty");
+      const ready = Boolean(payload?.profile_ready);
+      if (empty) empty.hidden = ready && (payload?.items || []).length > 0;
+      if (!ready) {
+        setText("intel-rec-empty-detail", payload?.hint || "先到「配置」页上传简历或填写岗位关键词。");
+      } else if (!(payload?.items || []).length) {
+        setText("intel-rec-empty-detail", payload?.hint || "没有岗位达到当前分数门槛，试试降低门槛。");
+      }
+      const kw = payload?.profile_keywords || {};
+      setText(
+        "intel-rec-meta",
+        ready
+          ? `依据简历中的 ${kw.directions || 0} 个方向词、${kw.keywords || 0} 个岗位关键词、${kw.skills || 0} 项技能，在 ${Number(payload?.total_scanned || 0).toLocaleString("zh-CN")} 个已收录岗位中筛出 ${Number(payload?.matched || 0).toLocaleString("zh-CN")} 个匹配项。`
+          : "按你在「配置」页填写的简历偏好做方向 / 关键词 / 技能匹配，不需要模型密钥。",
+      );
+      list.replaceChildren();
+      for (const item of payload?.items || []) list.appendChild(renderRecommendationRow(item));
+      list.dataset.state = (payload?.items || []).length ? "ready" : "empty";
+      intelRecLoaded = true;
+    } catch (error) {
+      list.replaceChildren();
+      const note = document.createElement("p");
+      note.className = "muted-label";
+      note.textContent = `推荐加载失败：${error.message}`;
+      list.appendChild(note);
+    }
+  }
+
+  let intelRecHints = null;
+
+  function renderResumeHints(hints) {
+    const box = $("intel-resume-hints");
+    if (!box) return;
+    box.replaceChildren();
+    const groups = [
+      ["识别到的方向", hints?.directions || []],
+      ["识别到的技能", hints?.skills || []],
+      ["将用于筛选的关键词", hints?.title_keywords || []],
+    ];
+    let total = 0;
+    for (const [label, values] of groups) {
+      if (!values.length) continue;
+      total += values.length;
+      const row = document.createElement("div");
+      row.className = "intel-resume-hint-row";
+      const name = document.createElement("span");
+      name.className = "muted-label";
+      name.textContent = `${label}：`;
+      row.appendChild(name);
+      for (const value of values) {
+        const chip = document.createElement("span");
+        chip.className = "intel-chip";
+        chip.textContent = value;
+        row.appendChild(chip);
+      }
+      box.appendChild(row);
+    }
+    if (hints?.degree) {
+      const row = document.createElement("div");
+      row.className = "intel-resume-hint-row";
+      const name = document.createElement("span");
+      name.className = "muted-label";
+      name.textContent = "学历：";
+      row.appendChild(name);
+      const chip = document.createElement("span");
+      chip.className = "intel-chip";
+      chip.textContent = hints.degree;
+      row.appendChild(chip);
+      box.appendChild(row);
+    }
+    box.hidden = total === 0;
+    const saveButton = $("intel-resume-save");
+    if (saveButton) saveButton.disabled = total === 0;
+    setText(
+      "intel-resume-status",
+      total
+        ? `共识别到 ${total} 项，确认无误后点「保存并推荐」。`
+        : "没识别到可用关键词，试试粘贴更完整的内容（技能、项目、实习经历）。",
+    );
+  }
+
+  async function analyzeResumeText() {
+    const text = $("intel-resume-text")?.value?.trim() || "";
+    if (text.length < 20) {
+      showToast("简历内容太短，至少粘贴 20 个字", "error");
+      return;
+    }
+    setText("intel-resume-status", "正在提取…");
+    try {
+      const hints = await api("/api/intelligence/resume-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      intelRecHints = hints;
+      renderResumeHints(hints);
+    } catch (error) {
+      setText("intel-resume-status", `提取失败：${error.message}`);
+    }
+  }
+
+  async function saveResumeHints() {
+    if (!intelRecHints) return;
+    const button = $("intel-resume-save");
+    if (button) button.disabled = true;
+    setText("intel-resume-status", "正在保存…");
+    try {
+      await api("/api/intelligence/profile-save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          skills: intelRecHints.skills || [],
+          title_keywords: intelRecHints.title_keywords || [],
+          primary_directions: intelRecHints.directions || [],
+          degree: intelRecHints.degree || "",
+        }),
+      });
+      setText("intel-resume-status", "已保存，正在按新偏好排序…");
+      intelRecLoaded = false;
+      await loadRecommendations();
+    } catch (error) {
+      setText("intel-resume-status", `保存失败：${error.message}`);
+      if (button) button.disabled = false;
+    }
+  }
+
   function switchIntelTab(tab) {
     const changes = $("intel-changes-view");
     const all = $("intel-all-view");
+    const recommend = $("intel-recommend-view");
     if (changes) changes.hidden = tab !== "changes";
     if (all) all.hidden = tab !== "all";
+    if (recommend) recommend.hidden = tab !== "recommend";
     document.querySelectorAll("[data-intel-tab]").forEach((button) => {
       const active = button.dataset.intelTab === tab;
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-selected", active ? "true" : "false");
     });
     if (tab === "all" && !intelJobsLoaded) void loadIntelligenceJobs(1);
+    if (tab === "recommend" && !intelRecLoaded) void loadRecommendations();
   }
 
   async function primeNavCounts() {
@@ -6569,6 +6750,15 @@
     });
     $("intel-job-prev")?.addEventListener("click", () => void loadIntelligenceJobs(intelJobPage - 1));
     $("intel-job-next")?.addEventListener("click", () => void loadIntelligenceJobs(intelJobPage + 1));
+    $("intel-rec-refresh")?.addEventListener("click", () => void loadRecommendations());
+    $("intel-rec-score")?.addEventListener("change", () => void loadRecommendations());
+    $("intel-rec-track")?.addEventListener("change", () => void loadRecommendations());
+    $("intel-rec-goto-config")?.addEventListener("click", () => {
+      const navButton = document.querySelector('[data-view="configuration"]');
+      if (navButton) navButton.click(); else switchView("configuration");
+    });
+    $("intel-resume-analyze")?.addEventListener("click", () => void analyzeResumeText());
+    $("intel-resume-save")?.addEventListener("click", () => void saveResumeHints());
   }
 
   function switchView(view) {

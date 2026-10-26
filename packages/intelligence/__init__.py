@@ -18,6 +18,8 @@ from .offerbiu_source import (
     fetch_offerbiu_postings,
     ingest_offerbiu_postings,
 )
+from .recommend import RecommendationItem, RecommendationResult, recommend_jobs
+from .resume_keywords import extract_profile_hints
 from .webhook import (
     NotifyConfig,
     NotifyConfigError,
@@ -35,13 +37,17 @@ __all__ = [
     "NotifyConfigError",
     "OfferBiuError",
     "OfferBiuIngestResult",
+    "RecommendationItem",
+    "RecommendationResult",
     "WebhookDelivery",
     "build_daily_digest",
+    "extract_profile_hints",
     "fetch_offerbiu_postings",
     "format_digest_text",
     "ingest_offerbiu_postings",
     "load_notify_config",
     "push_daily_digest",
+    "recommend_jobs",
     "record_pipeline_events",
     "send_webhook_message",
 ]
