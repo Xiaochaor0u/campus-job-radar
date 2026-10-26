@@ -7252,8 +7252,10 @@
     // ?view=intelligence opens the change feed directly (bookmarkable).
     const requestedView = new URLSearchParams(window.location.search).get("view");
     if (requestedView && [...document.querySelectorAll("[data-view-panel]")].some(panel => panel.dataset.viewPanel === requestedView)) initialView = requestedView;
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
     bind(); bindIntelligenceControls(); switchView(initialView); updateIntentHint(); renderConversation(); renderTaskHistory(); renderDashboardTodos(); loadCore();
     void primeNavCounts();
+    if (initialView === "intelligence" && requestedTab) switchIntelTab(requestedTab);
     if (initialView !== "intelligence") void loadIntelligence({ silent: true });
     window.setInterval(() => { if (activeView === "assistant" || hasPendingDailyNotices()) void refreshDailyProgress(); }, 5000);
     window.setInterval(() => { if (activeView === "assistant") void refreshConversationList({ quiet: true }); }, 5000);
