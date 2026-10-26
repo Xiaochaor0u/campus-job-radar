@@ -240,6 +240,7 @@
       }
       $("configuration-assistant-mode").value = payload.module_readiness?.assistant?.status === "disabled" ? "disabled" : "auto";
       assistantModeEdited = false;
+      inlineMessage("assistant-mode-message", "");
       const profile = payload.profile;
       form.elements.degree.value = degreeOption(profile.degree);
       form.elements.title_keywords.value = (profile.matching.title_keywords || []).join("\n");
@@ -251,6 +252,19 @@
       const active = modelConnections.find((item) => item.id === activeModelConnectionId);
       const diagnostic = payload.module_readiness?.assistant || {status: !active?.key_configured ? "missing_model" : "unknown"};
       $("configuration-model-status").textContent = ({missing_model: "待配置模型", disabled: "已主动关闭", restart_required: "待重启", configured: "模型已配置"})[diagnostic.status] || "状态待检查";
+      // A saved key with the assistant switched off is the single most confusing
+      // state: the summary says "已主动关闭" while the switch lives in a collapsed
+      // section. Open it and say what to do instead of leaving people guessing.
+      const advanced = $("assistant-advanced-options");
+      if (advanced && diagnostic.status === "disabled") {
+        advanced.open = true;
+        const llmOn = payload.settings?.llm_enabled === true;
+        inlineMessage("assistant-mode-message", llmOn
+          ? "简历解析与岗位评分已开启；聊天助理未启用（它需要额外的运行时可执行文件，可选，不影响评分）。"
+          : "密钥已保存，但模型调用还是关闭的。把「求职助理」改成「随有效模型连接启用」并保存后，简历解析与岗位评分才会生效。", false);
+      } else if (advanced && diagnostic.status === "configured") {
+        inlineMessage("assistant-mode-message", "");
+      }
       document.dispatchEvent(new CustomEvent("recruitops:assistant-configuration", {detail: {status: diagnostic.status}}));
       const scoringReady = payload.module_readiness?.job_scoring?.ready === true;
       const mailConfigured = mailboxConfigured();
@@ -282,7 +296,12 @@
   document.addEventListener("recruitops:configuration-reload", load);
   form.addEventListener("input", syncCapabilityDependencies);
   form.addEventListener("change", syncCapabilityDependencies);
-  $("configuration-assistant-mode").addEventListener("change", () => { assistantModeEdited = true; });
+  $("configuration-assistant-mode").addEventListener("change", () => {
+    assistantModeEdited = true;
+    // The switch is only persisted by a save; without this hint people change it,
+    // scroll away, and still see "已主动关闭" in the summary above.
+    inlineMessage("assistant-mode-message", "已修改，需点下方「保存模型连接」或页面底部「保存配置」才会生效。", false);
+  });
   function assistantOverrides() {
     if (!assistantModeEdited) return {};
     const enabled = $("configuration-assistant-mode").value !== "disabled";

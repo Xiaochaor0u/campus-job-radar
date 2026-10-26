@@ -714,21 +714,48 @@ def decode_upload(body: Upload) -> bytes:
 def upload_resume(body: Upload):
     require_owner()
     content = decode_upload(body)
-    try:
-        if body.filename.lower().endswith(".pdf"):
+    # Report the actual cause instead of one catch-all message: "missing pypdf"
+    # and "scanned PDF" need completely different fixes, and the old blanket
+    # text sent people off converting a perfectly readable PDF into a TXT.
+    name = body.filename.lower()
+    if name.endswith(".pdf"):
+        try:
             from pypdf import PdfReader
+        except ImportError:
+            raise HTTPException(
+                503,
+                "本地缺少 PDF 解析依赖 pypdf。请先安装依赖：pip install -e \".[dev]\"（或 pip install pypdf），"
+                "然后重启服务。不是简历文件的问题。",
+            ) from None
+        try:
             reader = PdfReader(io.BytesIO(content))
-            if reader.is_encrypted or len(reader.pages) > 20:
-                raise ValueError("PDF encrypted or too long")
+        except Exception:
+            raise HTTPException(422, "这个文件不是可读取的 PDF（可能已损坏或后缀与实际内容不符）。") from None
+        if reader.is_encrypted:
+            raise HTTPException(422, "PDF 设置了密码保护，请先另存为无密码版本再上传。") from None
+        if len(reader.pages) > 20:
+            raise HTTPException(422, f"PDF 有 {len(reader.pages)} 页，超过 20 页上限，请精简后重试。") from None
+        try:
             text = "\n".join(page.extract_text() or "" for page in reader.pages)
-        elif body.filename.lower().endswith((".txt", ".md")):
+        except Exception:
+            raise HTTPException(422, "PDF 文字层无法解析，请用 Word/WPS 重新导出为 PDF。") from None
+        if len(text.strip()) < 30:
+            raise HTTPException(
+                422,
+                "这个 PDF 里没有可提取的文字，通常是扫描件、截图拼成的 PDF，或文字被转成了曲线。"
+                "请用 Word/WPS/LaTeX 等可选中文字的编辑器重新导出，或直接粘贴简历文本。",
+            ) from None
+    elif name.endswith((".txt", ".md")):
+        try:
             text = content.decode("utf-8-sig")
-        else:
-            raise ValueError("unsupported format")
-    except Exception:
-        raise HTTPException(422, "无法读取简历。支持文字版 PDF、UTF-8 TXT/MD；扫描件请先转换为文字。") from None
-    if len(text.strip()) < 30 or len(text) > 60_000:
-        raise HTTPException(422, "简历正文为空、过短或过长，请核对文件")
+        except UnicodeDecodeError:
+            raise HTTPException(422, "文本文件不是 UTF-8 编码，请另存为 UTF-8 后重试。") from None
+    else:
+        raise HTTPException(422, "只支持 PDF、TXT、MD 文件；Word 文档请先另存为 PDF。") from None
+    if len(text.strip()) < 30:
+        raise HTTPException(422, "简历正文过短（少于 30 字），请核对文件内容") from None
+    if len(text) > 60_000:
+        raise HTTPException(422, "简历正文过长（超过 6 万字），请精简后重试") from None
     # The returned text is a draft. Only the explicit save applies it to scoring.
     return {"text": text.strip(), "filename": body.filename}
 

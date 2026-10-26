@@ -353,10 +353,20 @@ async def app_lifespan(_app: FastAPI):
     if bridge_enabled:
         await browser_bridge_server.start()
     if getattr(settings, "codex_runtime_enabled", False):
-        await get_codex_bff_service().start()
+        try:
+            await get_codex_bff_service().start()
+        except Exception as exc:  # noqa: BLE001 - optional runtime, never fatal
+            # The assistant runtime is an optional side-car binary. When it is
+            # missing (fresh clone without the runtime, stripped install) the
+            # whole workbench used to refuse to boot, taking the job intel feed
+            # and scoring down with it. Degrade instead: keep the app up, let
+            # the assistant report itself unhealthy.
+            logger.warning("codex runtime unavailable, assistant disabled for this run: %s", exc)
+            _app.state.codex_runtime_error = str(exc)
     automation_lifecycle = _AutomationWorkerLifecycle(
         _app.state,
-        codex_runtime_started=bool(getattr(settings, "codex_runtime_enabled", False)),
+        codex_runtime_started=bool(getattr(_app.state, "codex_runtime_error", None) is None
+                                   and getattr(settings, "codex_runtime_enabled", False)),
     )
     automation_lifecycle_task = None
     startup_mail_task = None

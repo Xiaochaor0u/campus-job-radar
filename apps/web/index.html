@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f7ff">
     <title>秋招工作台 | RecruitOps Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261026-11">
-    <script defer src="./app.js?v=intel-ui-20261026-11"></script>
-    <script defer src="./company-sources.js?v=intel-ui-20261026-11"></script>
-    <script defer src="./configuration.js?v=intel-ui-20261026-11"></script>
+    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261026-13">
+    <script defer src="./app.js?v=intel-ui-20261026-13"></script>
+    <script defer src="./company-sources.js?v=intel-ui-20261026-13"></script>
+    <script defer src="./configuration.js?v=intel-ui-20261026-13"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -627,6 +627,7 @@
                 <span class="configuration-inline-message" id="model-connection-message" role="status" aria-live="polite"></span>
                 <details class="configuration-guide" id="assistant-advanced-options"><summary>高级：助理模式</summary>
                   <label>求职助理<select id="configuration-assistant-mode"><option value="auto">随有效模型连接启用</option><option value="disabled">保持关闭</option></select></label>
+                  <span class="configuration-inline-message" id="assistant-mode-message" role="status" aria-live="polite"></span>
                 </details>
                 <p class="configuration-hint">连接测试会真实验证鉴权、模型名称、结构化输出和求职助理接口，不会保存尚未提交的密钥。</p>
               </fieldset>
