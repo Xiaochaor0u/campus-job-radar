@@ -32,7 +32,7 @@ from .manifest import (
     preview_documents,
     validate_unique_documents,
 )
-from .grounding import EvidenceGrounder, GroundedEvidence
+from .grounding import EvidenceGrounder, GroundedEvidence, NullRetriever
 from .ingest import (
     clean_source_text,
     document_from_profile_config,
@@ -53,6 +53,7 @@ __all__ = [
     "OpenAICompatibleEmbeddingProvider",
     "EvidenceGrounder",
     "GroundedEvidence",
+    "NullRetriever",
     "clean_source_text",
     "document_from_profile_config",
     "documents_from_json_records",

@@ -20,6 +20,25 @@ class GroundedEvidence(BaseModel):
     refusal_reason: str | None = None
 
 
+class NullRetriever:
+    """Retriever that always finds nothing.
+
+    Stand-in for deployments whose database cannot host the pgvector index
+    (SQLite default): the citation store is a Postgres-only feature, and the
+    grounded-answer contract prefers an explicit "no evidence" refusal over a
+    crashed MCP server.
+    """
+
+    def search(
+        self,
+        query: str,
+        *,
+        top_k: int = 5,
+        metadata_filter: Mapping[str, object] | None = None,
+    ) -> list[RetrievalResult]:
+        return []
+
+
 class EvidenceGrounder:
     """Turn retrieval results into an auditable context or an explicit refusal."""
 
@@ -71,4 +90,4 @@ class EvidenceGrounder:
         )
 
 
-__all__ = ["EvidenceGrounder", "GroundedEvidence"]
+__all__ = ["EvidenceGrounder", "GroundedEvidence", "NullRetriever"]

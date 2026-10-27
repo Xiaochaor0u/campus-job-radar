@@ -2,6 +2,8 @@ from functools import lru_cache
 import json
 import os
 import re
+import shutil
+import sys
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
@@ -357,4 +359,38 @@ def get_settings() -> Settings:
                 and mask.get("mail_sync_on_startup") is True
             )
         settings = Settings.model_validate(values)
+    settings = settings.model_copy(
+        update={"codex_command": _resolve_codex_command(settings.codex_command)}
+    )
     return settings
+
+
+def _resolve_codex_command(command: tuple[str, ...]) -> tuple[str, ...]:
+    """Point the default ``codex`` name at a real executable on Windows.
+
+    ``CreateProcess`` never applies ``PATHEXT``: spawning the bare name
+    ``codex`` fails with WinError 2 even when the npm shim ``codex.cmd`` sits
+    on PATH, which made the assistant look broken on every Windows machine
+    where the CLI is actually installed.  Resolve once at settings load so
+    every launcher (API, desktop, scheduled tasks) gets a spawnable path.
+    """
+
+    if not command or sys.platform != "win32":
+        return command
+    head = str(command[0])
+    if Path(head).is_absolute() or Path(head).suffix.lower() in {".exe", ".cmd", ".bat"}:
+        return command
+    home = Path.home()
+    candidates = (
+        shutil.which(head + ".exe"),
+        shutil.which(head + ".cmd"),
+        shutil.which(head + ".bat"),
+        str(home / "AppData" / "Roaming" / "npm" / (head + ".cmd")),
+    )
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return (candidate, *command[1:])
+    found = shutil.which(head)
+    if found and Path(found).suffix.lower() in {".exe", ".cmd", ".bat"}:
+        return (found, *command[1:])
+    return command

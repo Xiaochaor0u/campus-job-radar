@@ -18,6 +18,7 @@ from packages.browser_bridge import BrowserBridgeStore  # noqa: E402
 from packages.rag import (  # noqa: E402
     DeterministicEmbeddingProvider,
     EvidenceGrounder,
+    NullRetriever,
     PgVectorDocumentStore,
 )
 from packages.mcp import (  # noqa: E402
@@ -48,6 +49,11 @@ from packages.tools.oc_candidates import OcCandidateRunner  # noqa: E402
 
 def _evidence_grounder(configured: Settings, storage: Storage) -> EvidenceGrounder:
     engine = storage.engine
+    if engine.dialect.name != "postgresql":
+        # pgvector (and its CREATE EXTENSION) is Postgres-only.  SQLite
+        # deployments ship without the citation index instead of refusing to
+        # boot the MCP server — grounding answers with an explicit refusal.
+        return EvidenceGrounder(NullRetriever())
     # Remote compatible embedding providers are retired. This is a separate
     # local index; never rewrite old semantic vectors using another embedder.
     store = PgVectorDocumentStore(engine, DeterministicEmbeddingProvider())
