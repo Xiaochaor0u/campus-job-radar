@@ -6267,22 +6267,31 @@
   const INTELLIGENCE_TRACK_LABELS = { internship: "实习", campus: "校招", social: "社招", unknown: "" };
 
   function intelligenceTimeLabel(value) {
+    // Absolute date on purpose: a relative "昨天" goes stale — a list left
+    // open overnight would keep calling yesterday's rows "昨天" forever.
     if (!value) return "";
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return "";
-    const minutes = Math.round((Date.now() - parsed.getTime()) / 60000);
-    if (minutes < 1) return "刚刚";
-    if (minutes < 60) return `${minutes} 分钟前`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} 小时前`;
-    const days = Math.floor(hours / 24);
-    return days === 1 ? "昨天" : `${days} 天前`;
+    const pad = (part) => String(part).padStart(2, "0");
+    const now = new Date();
+    const date = parsed.getFullYear() === now.getFullYear()
+      ? `${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`
+      : `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
+    return `${date} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
   }
 
   function renderIntelligenceBadge(type, count) {
     const badge = document.createElement("span");
     badge.className = `intelligence-badge intelligence-badge--${type}`;
     badge.textContent = `${INTELLIGENCE_EVENT_LABELS[type] || type} ${count}`;
+    return badge;
+  }
+
+  function intelNatureBadge(nature) {
+    if (!nature) return null;
+    const badge = document.createElement("span");
+    badge.className = `company-nature company-nature--${nature}`;
+    badge.textContent = nature;
     return badge;
   }
 
@@ -6324,6 +6333,8 @@
       time.textContent = when;
       meta.appendChild(time);
     }
+    const natureBadge = intelNatureBadge(item.company_nature);
+    if (natureBadge) meta.prepend(natureBadge);
     if (meta.textContent || when) main.appendChild(meta);
     row.appendChild(main);
     return row;
@@ -6339,6 +6350,8 @@
     const name = document.createElement("h3");
     name.textContent = text(company.company_name);
     summary.appendChild(name);
+    const companyNature = intelNatureBadge(company.company_nature);
+    if (companyNature) summary.appendChild(companyNature);
     const badges = document.createElement("span");
     badges.className = "intelligence-badges";
     if (company.new_count) badges.appendChild(renderIntelligenceBadge("new", company.new_count));
@@ -6667,6 +6680,8 @@
     meta.className = "intelligence-meta";
     const bits = [item.city, INTEL_JOB_TRACK_LABELS[item.track], ...(item.reasons || [])].filter(Boolean);
     meta.textContent = bits.join(" · ");
+    const recNature = intelNatureBadge(item.company_nature);
+    if (recNature) meta.prepend(recNature);
     main.appendChild(meta);
 
     row.appendChild(main);
@@ -6887,9 +6902,11 @@
       renderWatchRules(payload?.rules || []);
       const latest = payload?.latest_event_at ? new Date(payload.latest_event_at) : null;
       if (latest && !Number.isNaN(latest.getTime())) {
-        const minutes = Math.round((Date.now() - latest.getTime()) / 60000);
-        const ago = minutes < 1 ? "刚刚" : minutes < 60 ? `${minutes} 分钟前` : `${Math.floor(minutes / 60)} 小时前`;
-        setText("watch-freshness", `数据最后更新：${ago}`);
+        const pad = (part) => String(part).padStart(2, "0");
+        setText(
+          "watch-freshness",
+          `数据最后更新：${pad(latest.getMonth() + 1)}-${pad(latest.getDate())} ${pad(latest.getHours())}:${pad(latest.getMinutes())}`,
+        );
       } else {
         setText("watch-freshness", "还没有采集记录");
       }
@@ -6928,6 +6945,8 @@
     const when = intelligenceTimeLabel(hit.detected_at);
     const bits = [hit.city, INTEL_JOB_TRACK_LABELS[hit.track], when].filter(Boolean);
     meta.textContent = bits.join(" · ");
+    const hitNature = intelNatureBadge(hit.company_nature);
+    if (hitNature) meta.prepend(hitNature);
     main.appendChild(meta);
     row.appendChild(main);
     return row;
@@ -7022,7 +7041,10 @@
     }
   }
 
+  let intelActiveTab = "changes";
+
   function switchIntelTab(tab) {
+    intelActiveTab = tab;
     const changes = $("intel-changes-view");
     const all = $("intel-all-view");
     const recommend = $("intel-recommend-view");
@@ -7036,6 +7058,14 @@
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-selected", active ? "true" : "false");
     });
+    // The sidebar keeps two entries into this view; sync their highlight.
+    document.querySelectorAll("[data-intel-nav-tab]").forEach((item) => {
+      item.classList.toggle("is-active", activeView === "intelligence" && item.dataset.intelNavTab === tab);
+    });
+    if (activeView === "intelligence") {
+      const tabTitles = { all: "全部岗位", recommend: "智能推荐", watch: "每日新增", changes: "今日新发布" };
+      setText("page-title", tabTitles[tab] || "今日新发布");
+    }
     if (tab === "all" && !intelJobsLoaded) void loadIntelligenceJobs(1);
     if (tab === "recommend" && !intelRecLoaded) void loadRecommendations();
     if (tab === "watch") {
@@ -7053,18 +7083,22 @@
   async function primeNavCounts() {
     // The internship badge used to be written only by renderJobStats(), which
     // runs when that view loads — so the sidebar showed "—" until the user
-    // clicked it. Fetch the count once at startup instead.
-    if (state.jobBrowse.internshipTotal !== null && state.jobBrowse.internshipTotal !== undefined) return;
-    try {
-      const payload = await api("/api/jobs/browse?limit=1&offset=0&track=internship");
-      const total = payload?.total ?? payload?.stats?.jobs;
-      if (total !== null && total !== undefined) {
-        state.jobBrowse.internshipTotal = total;
-        setText("nav-internship-count", total);
-      }
-    } catch (_) {
-      /* Leave the placeholder; the badge refreshes when the view opens. */
-    }
+    // clicked it. Fetch the counts once at startup instead.
+    await Promise.allSettled([
+      api("/api/jobs/browse?limit=1&offset=0&track=internship").then((payload) => {
+        const total = payload?.total ?? payload?.stats?.jobs;
+        if (total !== null && total !== undefined) {
+          state.jobBrowse.internshipTotal = total;
+          setText("nav-internship-count", total);
+        }
+      }),
+      // "全部岗位" is the full library (every cohort/track), not the strict
+      // 2027-confirmed view — surface the real 22k total in the sidebar.
+      api("/api/intelligence/jobs?page=1&page_size=1").then((payload) => {
+        const total = Number(payload?.total || 0);
+        if (total) setText("nav-all-jobs-count", total.toLocaleString("zh-CN"));
+      }),
+    ]);
   }
 
   function bindIntelligenceControls() {
@@ -7122,6 +7156,9 @@
     document.querySelectorAll("[data-view-panel]").forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== view; panel.classList.toggle("is-visible", panel.dataset.viewPanel === view); });
     document.querySelectorAll("[data-view]").forEach((item) => {
       let isActive = item.dataset.view === view;
+      if (isActive && view === "intelligence" && item.dataset.intelNavTab) {
+        isActive = item.dataset.intelNavTab === intelActiveTab;
+      }
       if (isActive && view === "jobs" && item.dataset.jobNavMode) {
         isActive = item.dataset.jobNavMode === state.jobBrowse.mode;
       }
@@ -7224,6 +7261,7 @@
         void loadJobBrowser({ refreshFeatured: true });
       }
       switchView(item.dataset.view);
+      if (item.dataset.intelNavTab) switchIntelTab(item.dataset.intelNavTab);
     }));
     document.addEventListener("click", (event) => {
       const taskButton = event.target.closest("[data-task]");

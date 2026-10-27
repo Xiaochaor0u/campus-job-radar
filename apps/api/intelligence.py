@@ -36,6 +36,111 @@ def _resolve_hours(config_hours: float, query_hours: float | None) -> float:
     return config_hours if query_hours is None else query_hours
 
 
+def _nature_lookup(company_ids) -> dict[str, str]:
+    """company_id -> ownership label, for every surface that names a company.
+
+    The 全部岗位 table resolves the label per row; the digest / recommend /
+    watch payloads are built from the event log, so this helper resolves the
+    label once per company instead.  Announcement wording wins, then
+    ``config/company_nature.yaml`` (see packages.intelligence.company_nature).
+    """
+
+    from sqlalchemy import String, func, select
+
+    from packages.intelligence.company_nature import load_nature_map, resolve_nature
+    from packages.storage import JobSnapshot
+
+    ids = sorted({str(cid or "").strip() for cid in company_ids} - {""})
+    if not ids:
+        return {}
+    nature_map = load_nature_map(get_settings().company_nature_config)
+    raw: dict[str, str] = {}
+    with _storage().session() as session:
+        # Pass 1: one representative row per company — all rows of a company
+        # come from the same source, but only some carry the companyNature
+        # wording, so a single row is not always enough.
+        first_ids = list(
+            session.scalars(
+                select(func.min(JobSnapshot.id))
+                .where(JobSnapshot.company_id.in_(ids))
+                .group_by(JobSnapshot.company_id)
+            ).all()
+        )
+        rows = list(
+            session.execute(
+                select(JobSnapshot.company_id, JobSnapshot.capture_evidence).where(
+                    JobSnapshot.id.in_(first_ids)
+                )
+            ).all()
+        )
+        for company_id, evidence in rows:
+            value = (evidence or {}).get("company_nature")
+            if value:
+                raw[company_id] = value
+        pending = [cid for cid in ids if cid not in raw]
+        if pending:
+            # Pass 2: for companies whose representative row said nothing,
+            # look at their other rows — filtered server-side so the query
+            # only touches rows that actually mention company_nature.
+            try:
+                mentions = func.cast(JobSnapshot.capture_evidence, String).like(
+                    '%"company_nature"%'
+                )
+                extra = list(
+                    session.execute(
+                        select(JobSnapshot.company_id, JobSnapshot.capture_evidence).where(
+                            JobSnapshot.company_id.in_(pending), mentions
+                        )
+                    ).all()
+                )
+            except Exception:
+                extra = list(
+                    session.execute(
+                        select(JobSnapshot.company_id, JobSnapshot.capture_evidence).where(
+                            JobSnapshot.company_id.in_(pending)
+                        )
+                    ).all()
+                )
+            for company_id, evidence in extra:
+                if company_id in raw:
+                    continue
+                value = (evidence or {}).get("company_nature")
+                if value:
+                    raw[company_id] = value
+    resolved: dict[str, str] = {}
+    for company_id in ids:
+        label = resolve_nature(
+            nature_map,
+            company_id=company_id,
+            raw_nature=raw.get(company_id, ""),
+        )
+        if label:
+            resolved[company_id] = label
+    return resolved
+
+
+def _with_nature(payload: dict[str, Any], *, items_key: str | None, companies_key: str | None = None) -> dict[str, Any]:
+    """Attach ``company_nature`` to the payload's items (and company groups)."""
+
+    company_ids = []
+    if companies_key:
+        company_ids.extend(row.get("company_id", "") for row in payload.get(companies_key) or [])
+    if items_key:
+        company_ids.extend(row.get("company_id", "") for row in payload.get(items_key) or [])
+    lookup = _nature_lookup(company_ids)
+    if not lookup:
+        return payload
+    if companies_key:
+        for row in payload.get(companies_key) or []:
+            row["company_nature"] = lookup.get(row.get("company_id", ""), "")
+            for item in row.get("items") or []:
+                item["company_nature"] = lookup.get(item.get("company_id", ""), "")
+    if items_key:
+        for row in payload.get(items_key) or []:
+            row["company_nature"] = lookup.get(row.get("company_id", ""), "")
+    return payload
+
+
 @router.get("/digest")
 def intelligence_digest(
     hours: float | None = Query(default=None, ge=0.5, le=24 * 30),
@@ -63,7 +168,7 @@ def intelligence_digest(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return digest.to_dict()
+    return _with_nature(digest.to_dict(), items_key=None, companies_key="companies")
 
 
 @router.get("/events")
@@ -89,13 +194,16 @@ def intelligence_events(
                 continue
             items.append(item.to_dict())
     items.sort(key=lambda row: row.get("detected_at") or "", reverse=True)
-    return {
-        "hours": hours,
-        "company_id": company_id,
-        "event_type": event_type,
-        "total": len(items),
-        "items": items[:limit],
-    }
+    return _with_nature(
+        {
+            "hours": hours,
+            "company_id": company_id,
+            "event_type": event_type,
+            "total": len(items),
+            "items": items[:limit],
+        },
+        items_key="items",
+    )
 
 
 @router.get("/jobs")
@@ -229,7 +337,7 @@ def intelligence_recommend(
         track=track or None,
         company_id=company_id or None,
     )
-    return result.to_dict()
+    return _with_nature(result.to_dict(), items_key="items")
 
 
 @router.post("/job-insight")
@@ -467,7 +575,7 @@ def watch_run(
         rule_id=rule_id,
         rule_name=rule_name,
     )
-    return result.to_dict()
+    return _with_nature(result.to_dict(), items_key="hits")
 
 
 @router.get("/coverage")

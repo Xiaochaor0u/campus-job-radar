@@ -509,6 +509,37 @@ class CodexTurnInterruptRequest(BaseModel):
     turn_id: str = Field(min_length=1, max_length=256)
 
 
+def _codex_runtime_ready(settings=None) -> bool:
+    """Configured *and* actually started.
+
+    ``codex_runtime_enabled`` only records the user's intent. The runtime is an
+    optional side-car binary: when it is missing, startup records the failure on
+    ``app.state`` and the assistant endpoints must say so instead of raising a
+    bare 500 from the un-started service.
+    """
+
+    settings = settings or get_settings()
+    if not getattr(settings, "codex_runtime_enabled", False):
+        return False
+    return getattr(app.state, "codex_runtime_error", None) is None
+
+
+def _codex_unavailable_detail() -> str:
+    reason = str(getattr(app.state, "codex_runtime_error", "") or "").strip()
+    if reason:
+        return (
+            "求职助理需要额外的 codex 运行时，本机未安装或启动失败（"
+            + reason[:120]
+            + "）。岗位情报、岗位评分和岗位画像都不受影响。"
+        )
+    return "求职助理当前未启用，可在「配置」页的「高级：助理模式」里开启。"
+
+
+def _require_codex_runtime() -> None:
+    if not _codex_runtime_ready():
+        raise HTTPException(status_code=503, detail=_codex_unavailable_detail())
+
+
 @app.get("/api/codex/health", tags=["codex"])
 async def codex_health() -> dict[str, Any]:
     settings = get_settings()
@@ -531,8 +562,7 @@ async def codex_health() -> dict[str, Any]:
 
 @app.get("/api/codex/mcp-status", tags=["codex"])
 async def codex_mcp_status() -> dict[str, Any]:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     result = await get_codex_bff_service().mcp_status()
     return dict(result) if isinstance(result, Mapping) else {"data": result}
 
@@ -561,8 +591,7 @@ def _is_unloaded_thread_error(error: JsonRpcRemoteError) -> bool:
 
 @app.post("/api/codex/threads", tags=["codex"])
 async def codex_thread_start(request: CodexThreadStartRequest) -> dict[str, Any]:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     params = {"cwd": request.cwd} if request.cwd else {}
     thread = await get_codex_bff_service().thread_start(**params)
     return thread.model_dump(mode="json") if isinstance(thread, BaseModel) else dict(thread)
@@ -574,8 +603,7 @@ async def codex_thread_list(
     limit: int = Query(default=20, ge=1, le=100),
     archived: bool = False,
 ) -> dict[str, Any]:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     local = []
     if not cursor and not archived and getattr(get_settings(), "database_url", None):
         from packages.automation.conversations import list_conversations, thread_updated_at
@@ -607,8 +635,7 @@ async def codex_thread_read(
     thread_id: str,
     include_turns: bool = Query(default=True),
 ) -> dict[str, Any]:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     local = None
     if getattr(get_settings(), "database_url", None):
         from packages.automation.conversations import read_conversation, thread_updated_at
@@ -670,8 +697,7 @@ async def codex_thread_read(
 
 @app.post("/api/codex/threads/{thread_id}/resume", tags=["codex"])
 async def codex_thread_resume(thread_id: str) -> dict[str, Any]:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     if getattr(get_settings(), "database_url", None):
         from packages.automation.conversations import read_conversation
         local = await asyncio.to_thread(read_conversation,
@@ -688,8 +714,7 @@ async def codex_thread_resume(thread_id: str) -> dict[str, Any]:
 
 @app.delete("/api/codex/threads/{thread_id}", tags=["codex"])
 async def codex_thread_delete(thread_id: str) -> dict[str, str]:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     local = None
     if getattr(get_settings(), "database_url", None):
         from packages.automation.conversations import read_conversation, archive_conversation
@@ -767,8 +792,7 @@ async def _automation_followup(service, thread_id: str, request: CodexTurnStartR
 
 @app.post("/api/codex/threads/{thread_id}/turns", tags=["codex"])
 async def codex_turn_start(thread_id: str, request: CodexTurnStartRequest) -> dict[str, Any]:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     service = get_codex_bff_service()
     runtime_thread_id, prompt = await _automation_followup(service, thread_id, request)
     if runtime_thread_id != thread_id:
@@ -790,8 +814,7 @@ async def codex_turn_stream(
     thread_id: str,
     request: CodexTurnStartRequest,
 ) -> StreamingResponse:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     service = get_codex_bff_service()
     runtime_thread_id, prompt = await _automation_followup(service, thread_id, request)
     prepared_subscription = None
@@ -857,16 +880,14 @@ async def codex_turn_interrupt(
     thread_id: str,
     request: CodexTurnInterruptRequest,
 ) -> dict[str, str]:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
     await get_codex_bff_service().turn_interrupt(thread_id, request.turn_id)
     return {"status": "interrupt_requested", "thread_id": thread_id, "turn_id": request.turn_id}
 
 
 @app.get("/api/codex/threads/{thread_id}/events", tags=["codex"])
 async def codex_thread_events(thread_id: str) -> StreamingResponse:
-    if not get_settings().codex_runtime_enabled:
-        raise HTTPException(status_code=503, detail="Codex runtime is disabled")
+    _require_codex_runtime()
 
     async def stream():
         async for event in get_codex_bff_service().event_stream(thread_id):
