@@ -5860,3 +5860,15 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
 .company-nature--国资 { color: #7d2f38; border-color: #eccfd3; background: #fdeff1; }
 .company-nature--外资 { color: #4a3a7a; border-color: #d8d0ea; background: #f3f0fa; }
 .company-nature--合资 { color: #7a4a12; border-color: #ecd7b4; background: #fbf1e2; }
+.collect-panel { margin: 0 0 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-subtle); }
+.collect-panel summary { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.collect-panel summary::-webkit-details-marker { display: none; }
+.collect-panel-title { font-weight: 600; }
+.collect-panel-hint { color: var(--muted); font-size: 12px; }
+.collect-panel-body { padding: 4px 14px 14px; border-top: 1px dashed var(--line-strong); }
+.collect-panel-body .muted-label { margin: 10px 0 6px; }
+.collect-panel-note { margin-top: 10px; font-size: 12px; }
+.intel-collect-groups, .intel-collect-tracks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.intel-check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+.intel-check input { accent-color: var(--accent, #2f6fed); }
+.intel-collect-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }

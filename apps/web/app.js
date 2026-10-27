@@ -6280,6 +6280,146 @@
     return `${date} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
   }
 
+  // ---- 手动采集（按行业范围） ----
+  let collectOptionsCache = null;
+  let collectPollTimer = null;
+
+  function collectSelections() {
+    const groups = [];
+    document.querySelectorAll("#intel-collect-groups input:checked").forEach((box) => groups.push(box.value));
+    const types = [];
+    document.querySelectorAll("#intel-collect-tracks input:checked").forEach((box) => types.push(box.value));
+    return { groups, types };
+  }
+
+  function renderCollectPanel(options, selectedGroups) {
+    const groupBox = $("intel-collect-groups");
+    if (!groupBox) return;
+    groupBox.replaceChildren();
+    for (const group of options?.industry_groups || []) {
+      const label = document.createElement("label");
+      label.className = "intel-check";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.value = group.code;
+      box.checked = (selectedGroups || []).includes(group.code);
+      label.appendChild(box);
+      label.appendChild(document.createTextNode(group.label));
+      groupBox.appendChild(label);
+    }
+    const trackBox = $("intel-collect-tracks");
+    if (trackBox) {
+      trackBox.replaceChildren();
+      for (const value of options?.recruit_types || []) {
+        const label = document.createElement("label");
+        label.className = "intel-check";
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.value = value;
+        box.checked = true;
+        label.appendChild(box);
+        const names = { "实习": "实习", "秋招": "秋招", "春招": "春招" };
+        label.appendChild(document.createTextNode(names[value] || value));
+        trackBox.appendChild(label);
+      }
+    }
+  }
+
+  function collectStatusLine(status) {
+    if (!status) return "";
+    if (status.running) {
+      const progress = status.progress || {};
+      if (status.phase === "fetching" && progress.recruit_type) {
+        return `正在拉取${progress.recruit_type}公告：第 ${progress.page || 0}/${progress.total_pages || "?"} 页（已取 ${progress.fetched || 0} 条）`;
+      }
+      if (status.phase === "ingesting") {
+        return `拉取完成，共 ${progress.fetched || 0} 条，其中 ${progress.in_scope || 0} 条在范围内，正在比对入库…`;
+      }
+      return "采集中…";
+    }
+    if (status.error) return `上次采集失败：${status.error}`;
+    const result = status.result;
+    if (result) {
+      return `上次采集完成：拉取 ${result.fetched_all ?? result.fetched ?? 0} 条 · 范围内 ${result.in_scope ?? result.fetched ?? 0} 条 · 新增 ${result.inserted ?? 0} · 变更 ${result.updated ?? 0}`;
+    }
+    return "还没有采集记录";
+  }
+
+  function applyCollectStatus(status) {
+    const button = $("intel-collect-button");
+    const summary = $("intel-collect-summary");
+    const line = $("intel-collect-status");
+    if (line) line.textContent = collectStatusLine(status);
+    if (button) {
+      button.disabled = Boolean(status?.running);
+      button.textContent = status?.running ? "采集中…" : "开始采集";
+    }
+    if (summary) {
+      summary.textContent = status?.running
+        ? "采集进行中，完成后本页自动刷新"
+        : "按选择的行业范围立即采集 OfferBiu 公告";
+    }
+    if (status && !status.running && collectPollTimer) {
+      window.clearInterval(collectPollTimer);
+      collectPollTimer = null;
+      // A finished run changed the events behind this view; refresh the feed.
+      void loadIntelligence({ silent: true });
+      intelJobsLoaded = false;
+    }
+  }
+
+  async function pollCollectStatus({ render = false } = {}) {
+    try {
+      const status = await api("/api/intelligence/collect/status");
+      if (render || status?.running) {
+        if (render && !collectOptionsCache) {
+          collectOptionsCache = status?.options || null;
+          renderCollectPanel(status?.options, status?.options?.selected_groups);
+        }
+        applyCollectStatus(status);
+      }
+      if (status?.running && !collectPollTimer) {
+        collectPollTimer = window.setInterval(() => void pollCollectStatus(), 2500);
+      }
+      return status;
+    } catch (error) {
+      const line = $("intel-collect-status");
+      if (line) line.textContent = `采集状态加载失败：${error.message}`;
+      return null;
+    }
+  }
+
+  async function startManualCollection() {
+    const { groups, types } = collectSelections();
+    if (!groups.length) { showToast("请至少选择一个行业范围", "error"); return; }
+    if (!types.length) { showToast("请至少选择一种招聘类型", "error"); return; }
+    const button = $("intel-collect-button");
+    if (button) button.disabled = true;
+    try {
+      await api("/api/intelligence/collect", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ industry_groups: groups, recruit_types: types }),
+      });
+      // Remember the scope so the next visit starts from the same choices.
+      // Same path as the configuration form (see configuration.js `post`).
+      api("/api/local-ui/configuration/save", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { offerbiu_industry_groups: groups } }),
+      }).catch(() => {});
+      showToast("采集已开始，完成后本页自动刷新");
+      collectPollTimer = window.setInterval(() => void pollCollectStatus(), 2500);
+    } catch (error) {
+      if (button) button.disabled = false;
+      showToast(`采集启动失败：${error.message}`, "error");
+    }
+  }
+
+  function bindIntelTabControls() {
+    $("intel-collect-button")?.addEventListener("click", () => void startManualCollection());
+  }
+
   function renderIntelligenceBadge(type, count) {
     const badge = document.createElement("span");
     badge.className = `intelligence-badge intelligence-badge--${type}`;
@@ -7149,6 +7289,7 @@
   }
 
   function bindIntelligenceControls() {
+    bindIntelTabControls();
     $("intelligence-refresh-button")?.addEventListener("click", () => void loadIntelligence());
     $("intelligence-window")?.addEventListener("change", () => void loadIntelligence());
     $("intelligence-track")?.addEventListener("change", () => void loadIntelligence());
@@ -7693,6 +7834,7 @@
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
     bind(); bindIntelligenceControls(); switchView(initialView); updateIntentHint(); renderConversation(); renderTaskHistory(); renderDashboardTodos(); loadCore();
     void primeNavCounts();
+    void pollCollectStatus({ render: true });
     if (initialView === "intelligence" && requestedTab) switchIntelTab(requestedTab);
     if (initialView !== "intelligence") void loadIntelligence({ silent: true });
     window.setInterval(() => { if (activeView === "assistant" || hasPendingDailyNotices()) void refreshDailyProgress(); }, 5000);

@@ -578,6 +578,70 @@ def watch_run(
     return _with_nature(result.to_dict(), items_key="hits")
 
 
+@router.get("/collect/status")
+def intelligence_collect_status() -> dict[str, Any]:
+    """Current manual-collection state plus the scope options for the UI."""
+
+    from packages.config import OFFERBIU_INDUSTRY_GROUP_OPTIONS
+    from packages.intelligence.manual_collect import VALID_RECRUIT_TYPES, collection_status
+
+    payload = collection_status()
+    payload["options"] = {
+        "industry_groups": [
+            {"code": code, "label": label} for code, label in OFFERBIU_INDUSTRY_GROUP_OPTIONS
+        ],
+        "recruit_types": list(VALID_RECRUIT_TYPES),
+        "selected_groups": list(get_settings().offerbiu_industry_groups),
+    }
+    return payload
+
+
+@router.post("/collect")
+def intelligence_collect(payload: dict[str, Any]) -> dict[str, Any]:
+    """Run one OfferBiu collection now, scoped by the caller's choices.
+
+    Progress is polled via ``/collect/status``.  The run itself fetches every
+    page of the selected recruit types (the feed cannot filter by industry
+    group server-side) and keeps only announcements tagged with a selected
+    ``industryGroupCodes`` value, so a CS student can keep the feed to
+    internet/semiconductor jobs without giving up the rest of the library.
+    """
+
+    from packages.intelligence.manual_collect import (
+        CollectionAlreadyRunning,
+        start_collection,
+    )
+
+    body = payload if isinstance(payload, dict) else {}
+    raw_groups = body.get("industry_groups")
+    if raw_groups is None:
+        groups = list(get_settings().offerbiu_industry_groups)
+    else:
+        if not isinstance(raw_groups, list) or not raw_groups or not all(
+            isinstance(value, str) and value.strip() for value in raw_groups
+        ):
+            raise HTTPException(status_code=422, detail="industry_groups 需要至少一个非空行业代码")
+        groups = [value.strip() for value in raw_groups]
+    raw_types = body.get("recruit_types")
+    if raw_types is None:
+        recruit_types = ["实习", "秋招", "春招"]
+    else:
+        if not isinstance(raw_types, list) or not raw_types:
+            raise HTTPException(status_code=422, detail="recruit_types 至少选择一种招聘类型")
+        recruit_types = [str(value).strip() for value in raw_types]
+
+    try:
+        return start_collection(
+            _storage(),
+            industry_groups=groups,
+            recruit_types=recruit_types,
+        )
+    except CollectionAlreadyRunning as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/coverage")
 def intelligence_coverage() -> dict[str, Any]:
     """How many postings are actually stored, per company and cohort state.

@@ -283,7 +283,7 @@
 
             <div class="source-note" id="intelligence-usage-note" role="note" aria-label="岗位情报来源">
               <strong>怎么用</strong>
-              <span>岗位来自 <code>config/companies.yaml</code> 里配置的企业官网，由每日定时任务自动采集。想加企业就改这个文件；想让新岗位推到群里，配置 <code>config/notify.yaml</code> 后运行「岗位情报日报推送」任务。</span>
+              <span>岗位来自 OfferBiu 公告与 <code>config/companies.yaml</code> 里配置的企业官网。上方「手动采集」可按行业范围随时采集；配置 <code>config/notify.yaml</code> 并运行「岗位情报日报推送」任务可把新岗位推到群里。</span>
             </div>
 
             <div class="intel-tabs" role="tablist" aria-label="岗位情报视图">
@@ -294,6 +294,24 @@
             </div>
 
             <div id="intel-changes-view">
+            <details class="collect-panel" id="intel-collect-panel">
+              <summary>
+                <span class="collect-panel-title">手动采集</span>
+                <span class="collect-panel-hint" id="intel-collect-summary">按选择的行业范围立即采集 OfferBiu 公告</span>
+              </summary>
+              <div class="collect-panel-body">
+                <p class="muted-label">行业范围（决定采集哪些行业的公告）：</p>
+                <div class="intel-collect-groups" id="intel-collect-groups"></div>
+                <p class="muted-label">招聘类型：</p>
+                <div class="intel-collect-tracks" id="intel-collect-tracks"></div>
+                <div class="intel-collect-actions">
+                  <button class="button" type="button" id="intel-collect-button">开始采集</button>
+                  <span class="muted-label" id="intel-collect-status"></span>
+                </div>
+                <p class="muted-label collect-panel-note">采集会把新公告记入「今日新发布」；范围之外的行业不会采集，也不会影响已经入库的岗位。全量采集约需 3–6 分钟，期间可以离开这个页面。</p>
+              </div>
+            </details>
+
             <div class="coverage-strip" id="intelligence-coverage" hidden>
               <span><strong id="coverage-total">—</strong> 个岗位已入库</span>
               <span><strong id="coverage-active">—</strong> 个在招</span>
