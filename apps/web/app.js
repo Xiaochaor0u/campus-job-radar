@@ -6330,17 +6330,27 @@
     }
   }
 
+  function elapsedText(startedAt) {
+    if (!startedAt) return "";
+    const parsed = new Date(startedAt);
+    if (Number.isNaN(parsed.getTime())) return "";
+    const seconds = Math.max(0, Math.round((Date.now() - parsed.getTime()) / 1000));
+    return seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+  }
+
   function collectStatusLine(status) {
     if (!status) return "";
     if (status.running) {
+      const elapsed = elapsedText(status.started_at);
+      const tail = elapsed ? `（已运行 ${elapsed}）` : "";
       const progress = status.progress || {};
       if (status.phase === "fetching" && progress.recruit_type) {
-        return `正在拉取${progress.recruit_type}公告：第 ${progress.page || 0}/${progress.total_pages || "?"} 页（已取 ${progress.fetched || 0} 条）`;
+        return `正在拉取${progress.recruit_type}公告：第 ${progress.page || 0}/${progress.total_pages || "?"} 页（已取 ${progress.fetched || 0} 条）${tail}`;
       }
       if (status.phase === "ingesting") {
-        return `拉取完成，共 ${progress.fetched || 0} 条，其中 ${progress.in_scope || 0} 条在范围内，正在比对入库…`;
+        return `拉取完成，共 ${progress.fetched || 0} 条，其中 ${progress.in_scope || 0} 条在范围内，正在比对入库…${tail}`;
       }
-      return "采集中…";
+      return `采集中…${tail}`;
     }
     if (status.error) return `上次采集失败：${status.error}`;
     const result = status.result;
@@ -6407,13 +6417,14 @@
     try {
       const status = await api("/api/intelligence/collect/status");
       lastCollectStatus = status;
-      if (render || status?.running) {
-        if (render && !collectOptionsCache) {
-          collectOptionsCache = status?.options || null;
-          renderCollectPanel(status?.options, status?.options?.selected_groups);
-        }
-        applyCollectStatus(status);
+      if (render && !collectOptionsCache) {
+        collectOptionsCache = status?.options || null;
+        renderCollectPanel(status?.options, status?.options?.selected_groups);
       }
+      // Always re-render: the run-finished branch below lives inside
+      // applyCollectStatus, so gating it behind `status.running` meant a
+      // completed run never stopped the spinner nor refreshed the feed.
+      applyCollectStatus(status);
       if (status?.running && !collectPollTimer) {
         collectPollTimer = window.setInterval(() => void pollCollectStatus(), 2500);
       }
