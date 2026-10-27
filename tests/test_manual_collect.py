@@ -1,5 +1,6 @@
 """Tests for the on-demand, industry-scoped OfferBiu collection."""
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -13,6 +14,13 @@ def _posting(code: str, company: str, title: str) -> dict:
         "industryGroupCodes": [code],
         "title": title,
     }
+
+
+@pytest.fixture(autouse=True)
+def isolated_state(monkeypatch, tmp_path):
+    """Never touch the real .data record while testing."""
+
+    monkeypatch.setattr(manual_collect, "_state_path", lambda: tmp_path / "last-collect.json")
 
 
 @pytest.fixture()
@@ -111,3 +119,20 @@ def test_invalid_recruit_type_is_rejected():
         manual_collect.start_collection(
             object(), industry_groups=["internet-tech"], recruit_types=["社招"]
         )
+
+
+def test_last_run_survives_a_restart(patched, tmp_path):
+    manual_collect.start_collection(
+        object(), industry_groups=["internet-tech"], recruit_types=["实习"]
+    )
+    manual_collect._collector._thread.join(timeout=2)
+    persisted = json.loads((tmp_path / "last-collect.json").read_text(encoding="utf-8"))
+    assert persisted["phase"] == "done"
+    assert persisted["result"]["in_scope"] == 2
+
+    fresh = manual_collect._Collector()
+    restored = fresh.status()
+    assert restored["running"] is False
+    assert restored["phase"] == "done"
+    assert restored["result"]["in_scope"] == 2
+    assert restored["scope"]["industry_groups"] == ["internet-tech"]

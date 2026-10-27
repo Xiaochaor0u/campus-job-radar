@@ -6283,6 +6283,11 @@
   // ---- 手动采集（按行业范围） ----
   let collectOptionsCache = null;
   let collectPollTimer = null;
+  let lastCollectStatus = null;
+
+  function collectionLastStatus() {
+    return lastCollectStatus;
+  }
 
   function collectSelections() {
     const groups = [];
@@ -6345,19 +6350,49 @@
     return "还没有采集记录";
   }
 
+  function groupLabels(codes) {
+    const map = new Map((collectOptionsCache?.industry_groups || []).map((g) => [g.code, g.label]));
+    const names = (codes || []).map((code) => map.get(code) || code);
+    return names.length ? names.join("、") : "未选择行业";
+  }
+
+  function currentScopeLabel(status) {
+    const explicit = collectSelections().groups;
+    const codes = explicit.length ? explicit : (status?.scope?.industry_groups || []);
+    return `当前范围：${groupLabels(codes)}（展开可修改）`;
+  }
+
+  function collectFreshnessLine(status) {
+    if (!status || status.running) return "";
+    const time = intelligenceTimeLabel(status.finished_at);
+    if (status.error) return `上次采集失败${time ? `（${time}）` : ""}：${status.error}`;
+    if (!status.result) return "还没有采集过，点「采集最新岗位」拉取第一批数据";
+    const result = status.result;
+    const scope = groupLabels(status.scope?.industry_groups);
+    return `上次采集 ${time || "—"} · 范围 ${scope} · 新增 ${result.inserted ?? 0} · 变更 ${result.updated ?? 0}`;
+  }
+
   function applyCollectStatus(status) {
     const button = $("intel-collect-button");
+    const topButton = $("intel-collect-top-button");
+    const freshness = $("intel-collect-freshness");
     const summary = $("intel-collect-summary");
     const line = $("intel-collect-status");
     if (line) line.textContent = collectStatusLine(status);
-    if (button) {
-      button.disabled = Boolean(status?.running);
-      button.textContent = status?.running ? "采集中…" : "开始采集";
+    if (freshness) {
+      const text = collectFreshnessLine(status);
+      freshness.textContent = text;
+      freshness.hidden = !text;
+    }
+    for (const target of [button, topButton]) {
+      if (!target) continue;
+      target.disabled = Boolean(status?.running);
+      target.textContent = status?.running ? "采集中…" : "采集最新岗位";
     }
     if (summary) {
       summary.textContent = status?.running
         ? "采集进行中，完成后本页自动刷新"
-        : "按选择的行业范围立即采集 OfferBiu 公告";
+        : currentScopeLabel(status);
     }
     if (status && !status.running && collectPollTimer) {
       window.clearInterval(collectPollTimer);
@@ -6371,6 +6406,7 @@
   async function pollCollectStatus({ render = false } = {}) {
     try {
       const status = await api("/api/intelligence/collect/status");
+      lastCollectStatus = status;
       if (render || status?.running) {
         if (render && !collectOptionsCache) {
           collectOptionsCache = status?.options || null;
@@ -6391,17 +6427,21 @@
 
   async function startManualCollection() {
     const { groups, types } = collectSelections();
-    if (!groups.length) { showToast("请至少选择一个行业范围", "error"); return; }
+    if (!groups.length) { showToast("请至少选择一个行业范围，可在「手动采集」面板里勾选", "error"); return; }
     if (!types.length) { showToast("请至少选择一种招聘类型", "error"); return; }
     const button = $("intel-collect-button");
-    if (button) button.disabled = true;
+    const topButton = $("intel-collect-top-button");
+    for (const target of [button, topButton]) {
+      if (target) target.disabled = true;
+    }
     try {
       await api("/api/intelligence/collect", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ industry_groups: groups, recruit_types: types }),
       });
-      // Remember the scope so the next visit starts from the same choices.
+      // Remember the scope so the next visit starts from the same choices,
+      // and so 采集最新岗位 keeps using it without opening the panel.
       // Same path as the configuration form (see configuration.js `post`).
       api("/api/local-ui/configuration/save", {
         method: "POST",
@@ -6409,15 +6449,26 @@
         body: JSON.stringify({ settings: { offerbiu_industry_groups: groups } }),
       }).catch(() => {});
       showToast("采集已开始，完成后本页自动刷新");
+      const panel = $("intel-collect-panel");
+      if (panel) panel.open = false;
       collectPollTimer = window.setInterval(() => void pollCollectStatus(), 2500);
+      await pollCollectStatus();
     } catch (error) {
-      if (button) button.disabled = false;
+      for (const target of [button, topButton]) {
+        if (target) target.disabled = false;
+      }
       showToast(`采集启动失败：${error.message}`, "error");
     }
   }
 
   function bindIntelTabControls() {
     $("intel-collect-button")?.addEventListener("click", () => void startManualCollection());
+    $("intel-collect-top-button")?.addEventListener("click", () => void startManualCollection());
+    // Keep "current scope" honest while the user ticks boxes in the panel.
+    $("intel-collect-groups")?.addEventListener("change", () => {
+      const summary = $("intel-collect-summary");
+      if (summary) summary.textContent = currentScopeLabel(collectionLastStatus());
+    });
   }
 
   function renderIntelligenceBadge(type, count) {

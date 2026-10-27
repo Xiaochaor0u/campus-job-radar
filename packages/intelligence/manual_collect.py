@@ -14,9 +14,11 @@ row by row, on the ``industryGroupCodes`` field each announcement carries.
 
 from __future__ import annotations
 
+import json
 import re
 import threading
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from packages.intelligence.offerbiu_source import (
@@ -34,6 +36,14 @@ class CollectionAlreadyRunning(RuntimeError):
     """Raised when a second collection is requested mid-run."""
 
 
+def _state_path() -> Path:
+    """Where the last run is kept so the UI survives a service restart."""
+
+    from packages.config import get_settings
+
+    return Path(get_settings().agent_root) / ".data" / "last-collect.json"
+
+
 class _Collector:
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -49,6 +59,34 @@ class _Collector:
             "result": None,
             "error": "",
         }
+        self._restore()
+
+    def _restore(self) -> None:
+        """Reload the previous run; people restart the service every day."""
+
+        try:
+            raw = json.loads(_state_path().read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(raw, dict):
+            return
+        restored = dict(self._status)
+        for key in ("phase", "started_at", "finished_at", "run_id", "scope", "result", "error"):
+            if raw.get(key) is not None:
+                restored[key] = raw[key]
+        restored["running"] = False
+        self._status = restored
+
+    def _persist(self) -> None:
+        snapshot = {key: value for key, value in self._status.items() if key != "running"}
+        try:
+            path = _state_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(snapshot, ensure_ascii=False, default=str), encoding="utf-8"
+            )
+        except (OSError, TypeError):
+            pass
 
     def status(self) -> dict[str, Any]:
         with self._lock:
@@ -95,6 +133,9 @@ class _Collector:
     def _update(self, **fields: Any) -> None:
         with self._lock:
             self._status.update(fields)
+            finished = fields.get("running") is False
+        if finished:
+            self._persist()
 
     def _progress(self, message: str) -> None:
         match = _PAGE_RE.search(str(message))

@@ -5872,3 +5872,4 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
 .intel-check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
 .intel-check input { accent-color: var(--accent, #2f6fed); }
 .intel-collect-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.collect-freshness { font-size: 12px; color: var(--muted); text-align: right; max-width: 320px; line-height: 1.4; }
