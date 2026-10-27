@@ -261,11 +261,11 @@
           <section class="view-panel" id="intelligence-view" data-view-panel="intelligence" aria-labelledby="intelligence-heading" hidden>
             <div class="section-heading">
               <div>
-                <p class="eyebrow">岗位情报站 / 定时采集</p>
+                <p class="eyebrow" id="intelligence-eyebrow">岗位情报站 / 定时采集</p>
                 <h2 id="intelligence-heading">今日新发布</h2>
-                <p class="section-description">定时采集各企业官网后，按「新增 / 变更 / 下架」列出岗位变化。首次采集只建立基线，从第二天起看到的都是真实的新发布。</p>
+                <p class="section-description" id="intelligence-description">定时采集各企业官网后，按「新增 / 变更 / 下架」列出岗位变化。首次采集只建立基线，从第二天起看到的都是真实的新发布。</p>
               </div>
-              <div class="section-actions">
+              <div class="section-actions" id="intelligence-filters">
                 <label><span class="sr-only">统计窗口</span><select id="intelligence-window">
                   <option value="24">最近 24 小时</option>
                   <option value="72">最近 3 天</option>
@@ -281,7 +281,7 @@
               </div>
             </div>
 
-            <div class="source-note" role="note" aria-label="岗位情报来源">
+            <div class="source-note" id="intelligence-usage-note" role="note" aria-label="岗位情报来源">
               <strong>怎么用</strong>
               <span>岗位来自 <code>config/companies.yaml</code> 里配置的企业官网，由每日定时任务自动采集。想加企业就改这个文件；想让新岗位推到群里，配置 <code>config/notify.yaml</code> 后运行「岗位情报日报推送」任务。</span>
             </div>

@@ -7043,6 +7043,40 @@
 
   let intelActiveTab = "changes";
 
+  // Per-tab page furniture: the view is shared by four quite different tabs,
+  // so the heading / description / filter bar follow the active tab instead
+  // of always claiming to be 今日新发布.
+  const INTEL_TAB_META = {
+    changes: {
+      eyebrow: "岗位情报站 / 定时采集",
+      title: "今日新发布",
+      description: "定时采集各企业官网后，按「新增 / 变更 / 下架」列出岗位变化。首次采集只建立基线，从第二天起看到的都是真实的新发布。",
+      filters: true,
+      usage: true,
+    },
+    all: {
+      eyebrow: "岗位情报站 / 岗位库",
+      title: "全部岗位",
+      description: "全量岗位库：校招 + 实习一起收录，支持按类型、来源、关键词筛选。这里不区分届别，27届校招视图只是其中确认了毕业年份的子集。",
+      filters: false,
+      usage: false,
+    },
+    recommend: {
+      eyebrow: "岗位情报站 / 匹配",
+      title: "智能推荐",
+      description: "按你在「配置」页上传的简历偏好，给所有已收录岗位打分排序。打分离线完成，不需要模型密钥。",
+      filters: false,
+      usage: false,
+    },
+    watch: {
+      eyebrow: "岗位情报站 / 订阅",
+      title: "每日新增订阅",
+      description: "把你的领域 / 关键词 / 城市条件存成订阅，每次采集后一键筛出符合条件的新岗位。",
+      filters: false,
+      usage: false,
+    },
+  };
+
   function switchIntelTab(tab) {
     intelActiveTab = tab;
     const changes = $("intel-changes-view");
@@ -7053,6 +7087,12 @@
     if (all) all.hidden = tab !== "all";
     if (recommend) recommend.hidden = tab !== "recommend";
     if (watch) watch.hidden = tab !== "watch";
+    const meta = INTEL_TAB_META[tab] || INTEL_TAB_META.changes;
+    setText("intelligence-eyebrow", meta.eyebrow);
+    if ($("intelligence-heading")) $("intelligence-heading").textContent = meta.title;
+    if ($("intelligence-description")) $("intelligence-description").textContent = meta.description;
+    if ($("intelligence-filters")) $("intelligence-filters").hidden = !meta.filters;
+    if ($("intelligence-usage-note")) $("intelligence-usage-note").hidden = !meta.usage;
     document.querySelectorAll("[data-intel-tab]").forEach((button) => {
       const active = button.dataset.intelTab === tab;
       button.classList.toggle("is-active", active);
@@ -7064,6 +7104,13 @@
     });
     if (activeView === "intelligence") {
       const tabTitles = { all: "全部岗位", recommend: "智能推荐", watch: "每日新增", changes: "今日新发布" };
+      const tabEyebrows = {
+        changes: "岗位情报站 / 定时采集",
+        all: "岗位情报站 / 岗位库",
+        recommend: "岗位情报站 / 匹配",
+        watch: "岗位情报站 / 订阅",
+      };
+      setText("page-eyebrow", tabEyebrows[tab] || "岗位情报站 / 定时采集");
       setText("page-title", tabTitles[tab] || "今日新发布");
     }
     if (tab === "all" && !intelJobsLoaded) void loadIntelligenceJobs(1);
