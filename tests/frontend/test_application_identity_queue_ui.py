@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
+pytest.importorskip("playwright")  # optional E2E dependency; skip cleanly when absent
 from playwright.sync_api import expect, sync_playwright
 
 

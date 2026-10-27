@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+pytest.importorskip("playwright")  # optional E2E dependency; skip cleanly when absent
 from playwright.sync_api import Error
 
 from packages.recruitment_core.crawlers.tplink import HOME, TPLinkCrawler

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+pytest.importorskip("playwright")  # optional E2E dependency; skip cleanly when absent
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]

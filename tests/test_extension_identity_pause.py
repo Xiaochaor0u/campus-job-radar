@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+pytest.importorskip("playwright")  # optional E2E dependency; skip cleanly when absent
 from playwright.sync_api import sync_playwright
 
 

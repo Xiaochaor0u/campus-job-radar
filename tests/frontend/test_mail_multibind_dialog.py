@@ -3,6 +3,7 @@
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+pytest.importorskip("playwright")  # optional E2E dependency; skip cleanly when absent
 from playwright.sync_api import expect, sync_playwright
 
 from test_mail_confirmation_dialog import DIGEST, THREAD, MailDialogFixture
