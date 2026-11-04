@@ -42,10 +42,49 @@ def create_storage_engine(
     return sqlalchemy_create_engine(database_url, **engine_kwargs)
 
 
+#: Columns added after the first release.  PostgreSQL gets them from the SQL
+#: migrations under ``migrations/``; SQLite builds its schema from the ORM
+#: metadata, and ``create_all`` never alters an existing table, so local
+#: databases need the additive ``ALTER TABLE`` spelled out here.
+_SQLITE_ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
+    "job_snapshots": {
+        "publish_date": "DATE",
+        "deadline_date": "DATE",
+        "deadline_text": "VARCHAR(64)",
+    },
+}
+
+
+def ensure_additive_columns(bind: Engine) -> None:
+    """Add later columns to an existing SQLite database, in place.
+
+    Only additive, nullable columns are handled: that is the one shape that can
+    be applied safely to a live SQLite file without rebuilding the table.
+    Everything else belongs in a real migration.
+    """
+
+    if bind.dialect.name != "sqlite":
+        return
+    with bind.begin() as connection:
+        for table, columns in _SQLITE_ADDITIVE_COLUMNS.items():
+            existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(f"PRAGMA table_info({table})")
+            }
+            if not existing:
+                continue
+            for name, ddl in columns.items():
+                if name not in existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"
+                    )
+
+
 def initialize_schema(bind: Engine) -> None:
     """Create the Agent-owned schema; no source SQLite/JSON path is consulted."""
 
     Base.metadata.create_all(bind=bind)
+    ensure_additive_columns(bind)
 
 
 class Storage:

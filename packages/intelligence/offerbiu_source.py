@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -91,6 +91,7 @@ def fetch_offerbiu_postings(
     page_size: int = DEFAULT_PAGE_SIZE,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     delay_seconds: float = DEFAULT_DELAY_SECONDS,
+    stop_before: date | None = None,
     session: requests.Session | None = None,
     logger: Any = None,
 ) -> list[dict[str, Any]]:
@@ -98,6 +99,12 @@ def fetch_offerbiu_postings(
 
     Returns de-duplicated raw items.  Per-type paging keeps the request count
     predictable (a single mixed pass would need ~490 pages for everything).
+
+    ``stop_before`` turns this into a windowed read.  The feed is ordered by
+    publication date descending, so once a page ends before that day there is
+    nothing older worth fetching: a "last 7 days" pass costs a handful of
+    requests instead of the ~450 a full sweep needs.  That difference is the
+    whole reason the workbench button used to look stuck for minutes.
     """
 
     own_session = session is None
@@ -144,6 +151,18 @@ def fetch_offerbiu_postings(
                     )
                 if not items:
                     break
+                if stop_before is not None:
+                    page_dates = [
+                        value
+                        for value in (
+                            announcement_publish_date(item) for item in items
+                        )
+                        if value is not None
+                    ]
+                    # Descending order means "past the edge" is decided by the
+                    # oldest item on this page, not the newest.
+                    if page_dates and min(page_dates) < stop_before:
+                        break
                 page += 1
                 if delay_seconds:
                     import time
@@ -159,12 +178,64 @@ def fetch_offerbiu_postings(
 # Mapping
 # ---------------------------------------------------------------------------
 
+#: OfferBiu stamps ``sourceUpdatedAt`` at 16:00Z, which is 00:00 in Beijing.
+#: Publish dates are therefore only day-precise; converting in CST keeps the
+#: date the company actually published on instead of shifting it a day earlier.
+CST = timezone(timedelta(hours=8))
+
+
 def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
 def _clip(value: str, limit: int) -> str:
     return value if len(value) <= limit else value[: limit - 1] + "…"
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    raw = _text(value)
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def announcement_publish_date(item: Mapping[str, Any]) -> date | None:
+    """Source-side publication day, or None when the feed does not say.
+
+    ``importedAt`` is only a fallback: it records when OfferBiu ingested the
+    announcement, which can lag the publication by a day or two.
+    """
+
+    stamp = _parse_datetime(item.get("sourceUpdatedAt")) or _parse_datetime(
+        item.get("importedAt")
+    )
+    return stamp.astimezone(CST).date() if stamp else None
+
+
+def announcement_deadline(item: Mapping[str, Any]) -> tuple[date | None, str]:
+    """Return (exact close date, raw wording).
+
+    Most announcements only say 「尽快投递」 or 「长期有效」; those keep the raw
+    text and no date, and the UI shows the text verbatim rather than a fake day.
+    """
+
+    raw_date = _text(item.get("deadlineAt"))
+    parsed: date | None = None
+    if raw_date:
+        try:
+            parsed = date.fromisoformat(raw_date[:10])
+        except ValueError:
+            parsed = None
+    wording = _text(item.get("deadlineText"))
+    if not wording and parsed is not None:
+        wording = parsed.isoformat()
+    return parsed, _clip(wording, 64)
 
 
 def _cohort_years(item: Mapping[str, Any]) -> tuple[int | None, str | None]:
@@ -268,6 +339,10 @@ def _job_row(item: Mapping[str, Any], *, now: datetime) -> tuple[JobSnapshot, st
     except ValueError:
         last_seen = now
     company_id = _company_id(item)
+    published, (deadline_day, deadline_wording) = (
+        announcement_publish_date(item),
+        announcement_deadline(item),
+    )
     row = JobSnapshot(
         id=f"offerbiu-{item_id}",
         company_id=company_id,
@@ -284,11 +359,17 @@ def _job_row(item: Mapping[str, Any], *, now: datetime) -> tuple[JobSnapshot, st
             "cohort_source": cohort_source or "",
             "cohort_evidence": f"OfferBiu targetYears={cohort}" if cohort else "",
             "recruit_type": _text(item.get("recruitType")),
-            "deadline_text": _text(item.get("deadlineText")),
+            "deadline_text": deadline_wording,
+            "deadline_precision": "day" if deadline_day else ("text" if deadline_wording else ""),
+            "publish_date": published.isoformat() if published else "",
+            "publish_precision": "day" if published else "",
             "company_nature": _text(item.get("companyNature")),
             "industry": _text(item.get("industry")),
             "announcement_url": _text(item.get("announcementUrl")),
         },
+        publish_date=published,
+        deadline_date=deadline_day,
+        deadline_text=deadline_wording or None,
         availability_status="active" if status in ("", "ACTIVE") else "inactive",
         first_seen_at=last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc),
         last_seen_at=now,
@@ -365,6 +446,8 @@ def ingest_offerbiu_postings(
                     or (previous.detail_url or "") != row.detail_url
                     or (previous.jd_raw or "") != row.jd_raw
                     or (previous.availability_status or "") != row.availability_status
+                    or previous.deadline_date != row.deadline_date
+                    or (previous.deadline_text or "") != (row.deadline_text or "")
                 )
                 # Keep stable discovery timestamps across re-ingestion.
                 previous.title = row.title
@@ -376,6 +459,16 @@ def ingest_offerbiu_postings(
                 previous.batch = row.batch
                 previous.track = row.track
                 previous.availability_status = row.availability_status
+                # A published date never moves, so a missing value in this pass
+                # must not erase one learned earlier.  Deadlines, in contrast, do
+                # get extended or withdrawn — those follow the source verbatim.
+                previous.publish_date = row.publish_date or previous.publish_date
+                previous.deadline_date = row.deadline_date
+                previous.deadline_text = row.deadline_text
+                previous.capture_evidence = {
+                    **(previous.capture_evidence or {}),
+                    **row.capture_evidence,
+                }
                 previous.last_seen_at = current
                 previous.updated_at = current
                 if content_changed:
@@ -437,6 +530,8 @@ def ingest_offerbiu_postings(
 __all__ = [
     "OfferBiuError",
     "OfferBiuIngestResult",
+    "announcement_deadline",
+    "announcement_publish_date",
     "fetch_offerbiu_postings",
     "ingest_offerbiu_postings",
 ]

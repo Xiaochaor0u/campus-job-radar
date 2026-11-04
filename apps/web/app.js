@@ -244,19 +244,41 @@
     recruitment_mail_process: "处理全部待处理的招聘邮件，并按照安全规则更新投递进度和日程",
   };
 
+  // Every request gets a deadline.  Without one a stalled backend leaves the
+  // button spinning forever with no error to act on — which is exactly the
+  // "一直加载、也不会更新" complaint, whether the cause was a slow crawl or a
+  // dropped connection.
+  const API_TIMEOUT_MS = 45000;
+
   const api = async (path, options = {}) => {
-    const response = await fetch(path, { headers: { Accept: "application/json" }, ...options });
-    let payload = null;
-    try { payload = await response.json(); } catch (_) { payload = null; }
-    if (!response.ok) {
-      const detail = payload?.detail;
-      const error = new Error(typeof detail === "string" ? detail : detail?.message || `请求失败（${response.status}）`);
-      error.status = response.status;
-      error.code = detail?.code || "";
-      error.requestId = detail?.request_id || "";
+    const { timeoutMs = API_TIMEOUT_MS, ...rest } = options;
+    const controller = timeoutMs ? new AbortController() : null;
+    const timer = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+      const response = await fetch(path, {
+        headers: { Accept: "application/json" },
+        ...rest,
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      let payload = null;
+      try { payload = await response.json(); } catch (_) { payload = null; }
+      if (!response.ok) {
+        const detail = payload?.detail;
+        const error = new Error(typeof detail === "string" ? detail : detail?.message || `请求失败（${response.status}）`);
+        error.status = response.status;
+        error.code = detail?.code || "";
+        error.requestId = detail?.request_id || "";
+        throw error;
+      }
+      return payload;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw new Error(`请求超过 ${Math.round(timeoutMs / 1000)} 秒没有响应，请稍后重试（后端可能正在采集）`);
+      }
       throw error;
+    } finally {
+      if (timer) window.clearTimeout(timer);
     }
-    return payload;
   };
 
   const text = (value, fallback = "—") => String(value ?? fallback);
@@ -6289,12 +6311,21 @@
     return lastCollectStatus;
   }
 
+  const COLLECT_DAY_OPTIONS = [
+    { days: 1, label: "近 1 天" },
+    { days: 3, label: "近 3 天" },
+    { days: 7, label: "近 7 天" },
+    { days: 30, label: "近 30 天" },
+  ];
+
   function collectSelections() {
     const groups = [];
     document.querySelectorAll("#intel-collect-groups input:checked").forEach((box) => groups.push(box.value));
     const types = [];
     document.querySelectorAll("#intel-collect-tracks input:checked").forEach((box) => types.push(box.value));
-    return { groups, types };
+    const picked = document.querySelector("#intel-collect-days input:checked");
+    const days = Number(picked?.value || 7);
+    return { groups, types, days: Number.isFinite(days) && days > 0 ? days : 7 };
   }
 
   function renderCollectPanel(options, selectedGroups) {
@@ -6311,6 +6342,23 @@
       label.appendChild(box);
       label.appendChild(document.createTextNode(group.label));
       groupBox.appendChild(label);
+    }
+    const dayBox = $("intel-collect-days");
+    if (dayBox) {
+      dayBox.replaceChildren();
+      const current = Number(options?.selected_days || 7);
+      for (const option of COLLECT_DAY_OPTIONS) {
+        const label = document.createElement("label");
+        label.className = "intel-check";
+        const box = document.createElement("input");
+        box.type = "radio";
+        box.name = "intel-collect-days";
+        box.value = String(option.days);
+        box.checked = option.days === current;
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(option.label));
+        dayBox.appendChild(label);
+      }
     }
     const trackBox = $("intel-collect-tracks");
     if (trackBox) {
@@ -6355,7 +6403,8 @@
     if (status.error) return `上次采集失败：${status.error}`;
     const result = status.result;
     if (result) {
-      return `上次采集完成：拉取 ${result.fetched_all ?? result.fetched ?? 0} 条 · 范围内 ${result.in_scope ?? result.fetched ?? 0} 条 · 新增 ${result.inserted ?? 0} · 变更 ${result.updated ?? 0}`;
+      const window = result.days ? ` · 窗口 近 ${result.days} 天` : "";
+      return `上次采集完成：拉取 ${result.fetched_all ?? result.fetched ?? 0} 条 · 范围内 ${result.in_scope ?? result.fetched ?? 0} 条${window} · 新增 ${result.inserted ?? 0} · 变更 ${result.updated ?? 0}`;
     }
     return "还没有采集记录";
   }
@@ -6379,7 +6428,8 @@
     if (!status.result) return "还没有采集过，点「采集最新岗位」拉取第一批数据";
     const result = status.result;
     const scope = groupLabels(status.scope?.industry_groups);
-    return `上次采集 ${time || "—"} · 范围 ${scope} · 新增 ${result.inserted ?? 0} · 变更 ${result.updated ?? 0}`;
+    const window = result.days ? ` · 近 ${result.days} 天` : "";
+    return `上次采集 ${time || "—"} · 范围 ${scope}${window} · 新增 ${result.inserted ?? 0} · 变更 ${result.updated ?? 0}`;
   }
 
   function applyCollectStatus(status) {
@@ -6407,9 +6457,14 @@
     if (status && !status.running && collectPollTimer) {
       window.clearInterval(collectPollTimer);
       collectPollTimer = null;
-      // A finished run changed the events behind this view; refresh the feed.
+      // A finished run changed the events behind every tab; refresh the visible
+      // one so the numbers move without a manual reload.
       void loadIntelligence({ silent: true });
       intelJobsLoaded = false;
+      intelRecLoaded = false;
+      if (intelActiveTab === "watch" && $("intel-watch-list")) {
+        void runWatch({ ruleId: intelWatchActiveRule });
+      }
     }
   }
 
@@ -6437,7 +6492,7 @@
   }
 
   async function startManualCollection() {
-    const { groups, types } = collectSelections();
+    const { groups, types, days } = collectSelections();
     if (!groups.length) { showToast("请至少选择一个行业范围，可在「手动采集」面板里勾选", "error"); return; }
     if (!types.length) { showToast("请至少选择一种招聘类型", "error"); return; }
     const button = $("intel-collect-button");
@@ -6449,7 +6504,7 @@
       await api("/api/intelligence/collect", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ industry_groups: groups, recruit_types: types }),
+        body: JSON.stringify({ industry_groups: groups, recruit_types: types, days }),
       });
       // Remember the scope so the next visit starts from the same choices,
       // and so 采集最新岗位 keeps using it without opening the panel.
@@ -6497,6 +6552,62 @@
     return badge;
   }
 
+  // --- 发布时间 / 截止投递时间 -------------------------------------------
+  //
+  // The source states a publish day and, for a minority of announcements, an
+  // exact close date.  Everything else keeps the announcement's own wording
+  // (「尽快投递」「招满即止」) and, when even that is absent, says 「未公布」.
+  // Nothing here guesses a date: showing a fabricated deadline would be worse
+  // than admitting the announcement does not have one.
+  const INTEL_DAY_MS = 24 * 60 * 60 * 1000;
+
+  function intelDayLabel(value) {
+    const raw = String(value || "");
+    return raw.length >= 10 ? raw.slice(5, 10) : raw;
+  }
+
+  function intelDeadline(item) {
+    const rawDate = String(item?.deadline_date || "");
+    const wording = String(item?.deadline_text || "").trim();
+    if (rawDate) {
+      const closes = new Date(`${rawDate}T00:00:00`);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const days = Math.round((closes - today) / INTEL_DAY_MS);
+      if (Number.isFinite(days)) {
+        if (days < 0) return { state: "closed", text: `${intelDayLabel(rawDate)} 已截止` };
+        if (days === 0) return { state: "urgent", text: `${intelDayLabel(rawDate)} 今天截止` };
+        if (days <= 3) return { state: "urgent", text: `${intelDayLabel(rawDate)} 剩 ${days} 天` };
+        return { state: "open", text: `${intelDayLabel(rawDate)}（剩 ${days} 天）` };
+      }
+    }
+    if (wording) return { state: "text", text: wording };
+    return { state: "unknown", text: "未公布" };
+  }
+
+  function intelPublishText(item) {
+    return item?.publish_date ? intelDayLabel(item.publish_date) : "未公布";
+  }
+
+  function intelWindowText(item) {
+    const deadline = intelDeadline(item);
+    const hasPublish = Boolean(item?.publish_date);
+    if (!hasPublish && deadline.state === "unknown") return "发布与截止时间未公布";
+    return `发布 ${intelPublishText(item)} · 截止 ${deadline.text}`;
+  }
+
+  function intelWindowNode(item) {
+    const deadline = intelDeadline(item);
+    const node = document.createElement("span");
+    node.className = "intelligence-window";
+    if (deadline.state === "closed") node.classList.add("is-closed");
+    else if (deadline.state === "urgent") node.classList.add("is-urgent");
+    else if (deadline.state === "unknown") node.classList.add("is-unknown");
+    node.textContent = intelWindowText(item);
+    node.title = "发布时间取源站收录日（精确到天）；截止时间按公告原文，未写明就标未公布";
+    return node;
+  }
+
   function renderIntelligenceItem(item) {
     const row = document.createElement("li");
     row.className = `intelligence-item intelligence-item--${item.event_type}`;
@@ -6535,6 +6646,7 @@
       time.textContent = when;
       meta.appendChild(time);
     }
+    meta.appendChild(intelWindowNode(item));
     const natureBadge = intelNatureBadge(item.company_nature);
     if (natureBadge) meta.prepend(natureBadge);
     if (meta.textContent || when) main.appendChild(meta);
@@ -6785,8 +6897,15 @@
     trackCell.appendChild(badge);
     row.appendChild(trackCell);
 
+    const publishCell = document.createElement("td");
+    publishCell.className = item.publish_date ? "cell-muted" : "cell-muted is-unknown";
+    publishCell.textContent = intelPublishText(item);
+    row.appendChild(publishCell);
+
     const deadlineCell = document.createElement("td");
-    deadlineCell.textContent = text(item.deadline_text);
+    const deadline = intelDeadline(item);
+    deadlineCell.textContent = deadline.text;
+    deadlineCell.className = `intel-deadline is-${deadline.state}`;
     row.appendChild(deadlineCell);
 
     const sourceCell = document.createElement("td");
@@ -6815,7 +6934,7 @@
     body.replaceChildren();
     const loading = document.createElement("tr");
     const loadingCell = document.createElement("td");
-    loadingCell.colSpan = 7;
+    loadingCell.colSpan = 8;
     loadingCell.textContent = "加载中…";
     loading.appendChild(loadingCell);
     body.appendChild(loading);
@@ -6826,7 +6945,7 @@
       if (!items.length) {
         const emptyRow = document.createElement("tr");
         const cell = document.createElement("td");
-        cell.colSpan = 7;
+        cell.colSpan = 8;
         cell.textContent = "没有匹配的岗位";
         emptyRow.appendChild(cell);
         body.appendChild(emptyRow);
@@ -6844,7 +6963,7 @@
       body.replaceChildren();
       const errorRow = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 7;
+      cell.colSpan = 8;
       cell.textContent = `加载失败：${error.message}`;
       errorRow.appendChild(cell);
       body.appendChild(errorRow);
@@ -6882,6 +7001,7 @@
     meta.className = "intelligence-meta";
     const bits = [item.city, INTEL_JOB_TRACK_LABELS[item.track], ...(item.reasons || [])].filter(Boolean);
     meta.textContent = bits.join(" · ");
+    meta.appendChild(intelWindowNode(item));
     const recNature = intelNatureBadge(item.company_nature);
     if (recNature) meta.prepend(recNature);
     main.appendChild(meta);
@@ -7147,6 +7267,7 @@
     const when = intelligenceTimeLabel(hit.detected_at);
     const bits = [hit.city, INTEL_JOB_TRACK_LABELS[hit.track], when].filter(Boolean);
     meta.textContent = bits.join(" · ");
+    meta.appendChild(intelWindowNode(hit));
     const hitNature = intelNatureBadge(hit.company_nature);
     if (hitNature) meta.prepend(hitNature);
     main.appendChild(meta);

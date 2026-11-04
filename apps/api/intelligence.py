@@ -290,7 +290,10 @@ def intelligence_jobs(
                 "cohort": row.cohort,
                 "cohort_status": row.cohort_status,
                 "first_seen_at": row.first_seen_at.isoformat() if row.first_seen_at else "",
-                "deadline_text": (row.capture_evidence or {}).get("deadline_text", ""),
+                "publish_date": row.publish_date.isoformat() if row.publish_date else "",
+                "deadline_date": row.deadline_date.isoformat() if row.deadline_date else "",
+                "deadline_text": row.deadline_text
+                or (row.capture_evidence or {}).get("deadline_text", ""),
                 "recruit_type": (row.capture_evidence or {}).get("recruit_type", ""),
                 "industry": (row.capture_evidence or {}).get("industry", ""),
                 "company_nature": resolve_nature(
@@ -587,6 +590,7 @@ def intelligence_collect_status() -> dict[str, Any]:
 
     payload = collection_status()
     payload["options"] = {
+        "selected_days": get_settings().offerbiu_collect_days,
         "industry_groups": [
             {"code": code, "label": label} for code, label in OFFERBIU_INDUSTRY_GROUP_OPTIONS
         ],
@@ -600,11 +604,11 @@ def intelligence_collect_status() -> dict[str, Any]:
 def intelligence_collect(payload: dict[str, Any]) -> dict[str, Any]:
     """Run one OfferBiu collection now, scoped by the caller's choices.
 
-    Progress is polled via ``/collect/status``.  The run itself fetches every
-    page of the selected recruit types (the feed cannot filter by industry
-    group server-side) and keeps only announcements tagged with a selected
-    ``industryGroupCodes`` value, so a CS student can keep the feed to
-    internet/semiconductor jobs without giving up the rest of the library.
+    Progress is polled via ``/collect/status``.  The feed is ordered by
+    publication date, so ``days`` caps the read: it stops paging once the
+    window's edge is reached instead of sweeping all ~450 pages.  The window
+    also keeps the industry filter honest — a CS student still only keeps
+    announcements tagged with a selected ``industryGroupCodes`` value.
     """
 
     from packages.intelligence.manual_collect import (
@@ -629,12 +633,20 @@ def intelligence_collect(payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(raw_types, list) or not raw_types:
             raise HTTPException(status_code=422, detail="recruit_types 至少选择一种招聘类型")
         recruit_types = [str(value).strip() for value in raw_types]
+    raw_days = body.get("days", 7)
+    try:
+        days = int(raw_days)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="days 需要是整数天数") from exc
+    if days < 1 or days > 365:
+        raise HTTPException(status_code=422, detail="days 只能是 1~365")
 
     try:
         return start_collection(
             _storage(),
             industry_groups=groups,
             recruit_types=recruit_types,
+            days=days,
         )
     except CollectionAlreadyRunning as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

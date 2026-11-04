@@ -57,6 +57,10 @@ class RecommendationItem:
     detail_url: str
     score: int
     reasons: tuple[str, ...] = ()
+    #: Application window, "" when the announcement did not state it.
+    publish_date: str = ""
+    deadline_date: str = ""
+    deadline_text: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -70,6 +74,9 @@ class RecommendationItem:
             "detail_url": self.detail_url,
             "score": self.score,
             "reasons": list(self.reasons),
+            "publish_date": self.publish_date,
+            "deadline_date": self.deadline_date,
+            "deadline_text": self.deadline_text,
         }
 
 
@@ -250,6 +257,9 @@ def recommend_jobs(
                 JobSnapshot.batch,
                 JobSnapshot.detail_url,
                 JobSnapshot.capture_evidence,
+                JobSnapshot.publish_date,
+                JobSnapshot.deadline_date,
+                JobSnapshot.deadline_text,
             ).where(*conditions)
         ).all()
         company_names = {row.id: row.name for row in session.query(CompanySnapshot).all()}
@@ -283,6 +293,9 @@ def recommend_jobs(
                 detail_url=row.detail_url or "",
                 score=score,
                 reasons=reasons,
+                publish_date=row.publish_date.isoformat() if row.publish_date else "",
+                deadline_date=row.deadline_date.isoformat() if row.deadline_date else "",
+                deadline_text=row.deadline_text or "",
             )
         )
 

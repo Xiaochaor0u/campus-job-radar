@@ -17,11 +17,12 @@ from __future__ import annotations
 import json
 import re
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from packages.intelligence.offerbiu_source import (
+    CST,
     fetch_offerbiu_postings,
     ingest_offerbiu_postings,
 )
@@ -99,6 +100,7 @@ class _Collector:
         industry_groups: tuple[str, ...] | list[str],
         recruit_types: tuple[str, ...] | list[str],
         max_pages_per_type: int = 300,
+        days: int = 7,
     ) -> dict[str, Any]:
         groups = tuple(dict.fromkeys(str(code) for code in industry_groups))
         types = tuple(dict.fromkeys(str(value) for value in recruit_types))
@@ -106,6 +108,8 @@ class _Collector:
             raise ValueError("至少选择一个行业范围")
         if not types or any(value not in VALID_RECRUIT_TYPES for value in types):
             raise ValueError("招聘类型只能是：实习 / 秋招 / 春招")
+        if days < 1 or days > 365:
+            raise ValueError("时间窗口只能是 1~365 天")
         with self._lock:
             if self._status.get("running"):
                 raise CollectionAlreadyRunning("采集正在进行中")
@@ -116,14 +120,18 @@ class _Collector:
                 "started_at": datetime.now(timezone.utc).isoformat(),
                 "finished_at": "",
                 "run_id": "",
-                "scope": {"industry_groups": list(groups), "recruit_types": list(types)},
+                "scope": {
+                    "industry_groups": list(groups),
+                    "recruit_types": list(types),
+                    "days": days,
+                },
                 "result": None,
                 "error": "",
             }
             snapshot = dict(self._status)
             self._thread = threading.Thread(
                 target=self._run,
-                args=(storage, groups, types, max_pages_per_type),
+                args=(storage, groups, types, max_pages_per_type, days),
                 name="offerbiu-manual-collect",
                 daemon=True,
             )
@@ -157,11 +165,16 @@ class _Collector:
         groups: tuple[str, ...],
         recruit_types: tuple[str, ...],
         max_pages_per_type: int,
+        days: int,
     ) -> None:
         try:
+            # Only the window the user asked for: the feed is date-ordered, so
+            # stopping at the edge keeps a button click at seconds, not minutes.
+            stop_before = datetime.now(CST).date() - timedelta(days=days - 1)
             postings = fetch_offerbiu_postings(
                 recruit_types=recruit_types,
                 max_pages_per_type=max_pages_per_type,
+                stop_before=stop_before,
                 logger=self._progress,
             )
             fetched = len(postings)
@@ -187,6 +200,7 @@ class _Collector:
             payload["fetched_all"] = fetched
             payload["in_scope"] = len(scoped)
             payload["filtered_out"] = fetched - len(scoped)
+            payload["days"] = days
             self._update(
                 running=False,
                 phase="done",
@@ -212,6 +226,7 @@ def start_collection(
     industry_groups: tuple[str, ...] | list[str],
     recruit_types: tuple[str, ...] | list[str],
     max_pages_per_type: int = 300,
+    days: int = 7,
 ) -> dict[str, Any]:
     """Start one collection run; raises if another one is still going."""
 
@@ -220,6 +235,7 @@ def start_collection(
         industry_groups=industry_groups,
         recruit_types=recruit_types,
         max_pages_per_type=max_pages_per_type,
+        days=days,
     )
 
 

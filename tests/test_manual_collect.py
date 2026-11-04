@@ -1,6 +1,7 @@
 """Tests for the on-demand, industry-scoped OfferBiu collection."""
 
 import json
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -32,6 +33,7 @@ def patched(monkeypatch):
     def fake_fetch(*, recruit_types, max_pages_per_type, logger=None, **kwargs):
         captured["recruit_types"] = tuple(recruit_types)
         captured["max_pages"] = max_pages_per_type
+        captured["stop_before"] = kwargs.get("stop_before")
         if logger:
             logger("[offerbiu] 秋招 page 3/10 collected=30")
         return [
@@ -95,6 +97,32 @@ def test_multiple_groups_are_unioned(patched):
     status = _wait_for_result()
     assert patched["ingested"] == ["A 公司", "C 公司", "D 公司"]
     assert status["result"]["in_scope"] == 3
+
+
+def test_days_flag_becomes_a_publish_cutoff(patched):
+    manual_collect.start_collection(
+        object(),
+        industry_groups=["internet-tech"],
+        recruit_types=["秋招"],
+        days=1,
+    )
+    status = _wait_for_result()
+    cutoff = patched["stop_before"]
+    assert isinstance(cutoff, date)
+    # A one-day window means "today only", so the cutoff is today's date.
+    assert cutoff == datetime.now(timezone(timedelta(hours=8))).date()
+    assert status["scope"]["days"] == 1
+    assert status["result"]["days"] == 1
+
+
+def test_out_of_range_days_is_rejected():
+    with pytest.raises(ValueError, match="时间窗口"):
+        manual_collect.start_collection(
+            object(),
+            industry_groups=["internet-tech"],
+            recruit_types=["实习"],
+            days=0,
+        )
 
 
 def test_page_log_line_updates_progress():

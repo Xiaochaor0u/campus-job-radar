@@ -13,7 +13,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from packages.storage import JobEvent, Storage
+from packages.storage import JobEvent, JobSnapshot, Storage
 
 DIGEST_EVENT_TYPES = ("new", "updated", "removed")
 DEFAULT_DIGEST_HOURS = 24.0
@@ -34,6 +34,12 @@ class DigestItem:
     track: str
     detail_url: str
     detected_at: str
+    #: Application window, copied from the job snapshot when it is known.
+    #: Empty strings mean "the announcement did not say", which the UI renders
+    #: as 「未公布」 — never as a guessed date.
+    publish_date: str = ""
+    deadline_date: str = ""
+    deadline_text: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -47,6 +53,9 @@ class DigestItem:
             "track": self.track,
             "detail_url": self.detail_url,
             "detected_at": self.detected_at,
+            "publish_date": self.publish_date,
+            "deadline_date": self.deadline_date,
+            "deadline_text": self.deadline_text,
         }
 
 
@@ -169,10 +178,26 @@ def build_daily_digest(
             ).all()
         )
 
+    # One lookup for the whole page instead of a query per event: the event log
+    # stores no dates, so the application window has to come from the snapshot.
+    windows: dict[str, tuple[str, str, str]] = {}
+    job_ids = {row.job_id for row in rows if row.job_id}
+    if job_ids:
+        with storage.session() as session:
+            for snapshot in session.scalars(
+                select(JobSnapshot).where(JobSnapshot.id.in_(job_ids))
+            ).all():
+                windows[snapshot.id] = (
+                    snapshot.publish_date.isoformat() if snapshot.publish_date else "",
+                    snapshot.deadline_date.isoformat() if snapshot.deadline_date else "",
+                    snapshot.deadline_text or "",
+                )
+
     items: list[DigestItem] = []
     for row in rows:
         if track and str(row.track or "unknown") != str(track).strip():
             continue
+        published, closes, wording = windows.get(row.job_id, ("", "", ""))
         items.append(
             DigestItem(
                 event_type=row.event_type,
@@ -185,6 +210,9 @@ def build_daily_digest(
                 track=row.track,
                 detail_url=row.detail_url,
                 detected_at=row.detected_at.isoformat() if row.detected_at else "",
+                publish_date=published,
+                deadline_date=closes,
+                deadline_text=wording,
             )
         )
 

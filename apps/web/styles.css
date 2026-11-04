@@ -5785,6 +5785,28 @@ h3 { font-size: 16px; }
 a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underline; }
 .intelligence-meta { margin: 0; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; }
 .intelligence-time { color: var(--muted-light); }
+/* 发布时间 / 截止投递时间：未知的必须一眼能看出来是「不知道」，
+   而不是看起来像「没有截止时间」。 */
+.intelligence-window { margin-left: 10px; color: var(--ink-soft); }
+.intelligence-window.is-unknown { color: var(--muted-light); }
+.intelligence-window.is-urgent { color: var(--amber); font-weight: 600; }
+.intelligence-window.is-closed { color: var(--muted-light); text-decoration: line-through; }
+.intel-deadline.is-open { color: var(--ink-soft); }
+.intel-deadline.is-text { color: var(--ink-soft); }
+.intel-deadline.is-urgent { color: var(--amber); font-weight: 600; }
+.intel-deadline.is-closed { color: var(--muted-light); }
+.intel-deadline.is-unknown { color: var(--muted-light); }
+/* 八列平分会把岗位名挤成六行、把「画像」推出可视区，所以按内容分配宽度。 */
+.intel-jobs-table { min-width: 860px; }
+.intel-jobs-table th:nth-child(1), .intel-jobs-table td:nth-child(1) { width: 14%; }
+.intel-jobs-table th:nth-child(2), .intel-jobs-table td:nth-child(2) { width: 29%; }
+.intel-jobs-table th:nth-child(3), .intel-jobs-table td:nth-child(3) { width: 11%; }
+.intel-jobs-table th:nth-child(4), .intel-jobs-table td:nth-child(4) { width: 8%; }
+.intel-jobs-table th:nth-child(5), .intel-jobs-table td:nth-child(5) { width: 8%; }
+.intel-jobs-table th:nth-child(6), .intel-jobs-table td:nth-child(6) { width: 13%; }
+.intel-jobs-table th:nth-child(7), .intel-jobs-table td:nth-child(7) { width: 8%; }
+.intel-jobs-table th:nth-child(8), .intel-jobs-table td:nth-child(8) { width: 9%; }
+.cell-muted.is-unknown { color: var(--muted-light); }
 .intelligence-item--removed .intelligence-title { color: var(--muted); text-decoration: line-through; }
 @media (max-width: 700px) { .intelligence-company-summary { padding: 12px 14px; } .intelligence-items { padding: 0 14px 10px; } }
 
@@ -5868,7 +5890,7 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
 .collect-panel-body { padding: 4px 14px 14px; border-top: 1px dashed var(--line-strong); }
 .collect-panel-body .muted-label { margin: 10px 0 6px; }
 .collect-panel-note { margin-top: 10px; font-size: 12px; }
-.intel-collect-groups, .intel-collect-tracks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.intel-collect-groups, .intel-collect-tracks, .intel-collect-days { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .intel-check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
 .intel-check input { accent-color: var(--accent, #2f6fed); }
 .intel-collect-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }

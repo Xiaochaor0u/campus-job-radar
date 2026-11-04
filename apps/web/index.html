@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f7ff">
     <title>秋招工作台 | RecruitOps Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261026-15">
-    <script defer src="./app.js?v=intel-ui-20261026-15"></script>
-    <script defer src="./company-sources.js?v=intel-ui-20261026-15"></script>
-    <script defer src="./configuration.js?v=intel-ui-20261026-15"></script>
+    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261104-1">
+    <script defer src="./app.js?v=intel-ui-20261104-1"></script>
+    <script defer src="./company-sources.js?v=intel-ui-20261104-1"></script>
+    <script defer src="./configuration.js?v=intel-ui-20261104-1"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -306,11 +306,13 @@
                 <div class="intel-collect-groups" id="intel-collect-groups"></div>
                 <p class="muted-label">招聘类型：</p>
                 <div class="intel-collect-tracks" id="intel-collect-tracks"></div>
+                <p class="muted-label">只采集最近发布过的公告：</p>
+                <div class="intel-collect-days" id="intel-collect-days"></div>
                 <div class="intel-collect-actions">
                   <button class="button" type="button" id="intel-collect-button">开始采集</button>
                   <span class="muted-label" id="intel-collect-status"></span>
                 </div>
-                <p class="muted-label collect-panel-note">采集会把新公告记入「今日新发布」；范围之外的行业不会采集，也不会影响已经入库的岗位。全量采集约需 3–6 分钟，期间可以离开这个页面。</p>
+                <p class="muted-label collect-panel-note">采集会把新公告记入「今日新发布」；范围之外的行业不会采集，也不会影响已经入库的岗位。按时间窗采集只需几十秒（源站按发布时间倒序，翻到窗口边界就停）。</p>
               </div>
             </details>
 
@@ -356,9 +358,9 @@
                 <button class="button button--primary" id="intel-job-apply" type="button">筛选</button>
                 <button class="button button--ghost" id="intel-job-reset" type="reset">重置</button>
               </form>
-              <div class="table-scroll"><table class="data-table">
-                <thead><tr><th>公司</th><th>岗位</th><th>地点</th><th>类型</th><th>截止</th><th>来源</th><th class="intel-insight-col">画像</th></tr></thead>
-                <tbody id="intel-job-body"><tr><td colspan="7"><div class="loading-rows" aria-label="加载中"><span></span><span></span></div></td></tr></tbody>
+              <div class="table-scroll"><table class="data-table intel-jobs-table">
+                <thead><tr><th>公司</th><th>岗位</th><th>地点</th><th>类型</th><th>发布</th><th>截止投递</th><th>来源</th><th class="intel-insight-col">画像</th></tr></thead>
+                <tbody id="intel-job-body"><tr><td colspan="8"><div class="loading-rows" aria-label="加载中"><span></span><span></span></div></td></tr></tbody>
               </table></div>
               <div class="pager">
                 <button class="button button--ghost" id="intel-job-prev" type="button">上一页</button>

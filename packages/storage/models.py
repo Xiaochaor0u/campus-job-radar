@@ -197,6 +197,8 @@ class JobSnapshot(AuditMixin, Base):
         # evidence columns below are read for display and are deliberately not
         # indexed until a query needs it.
         Index("ix_job_snapshots_track", "track"),
+        Index("ix_job_snapshots_publish_date", "publish_date"),
+        Index("ix_job_snapshots_deadline_date", "deadline_date"),
         CheckConstraint(
             "capture_status IN ('unknown', 'pending', 'complete', 'failed')",
             name="ck_job_snapshots_capture_status",
@@ -271,6 +273,20 @@ class JobSnapshot(AuditMixin, Base):
     match_conditions: Mapped[dict[str, Any] | None] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
+
+    # --- Application window (migration 030) ---------------------------------
+    #
+    # Students need "when was this posted" and "when does it close" next to the
+    # title, not buried in the JD prose.  NULL means the source did not state it;
+    # the UI renders that as 「未公布」 instead of guessing a date.
+    #
+    #   * publish_date is day-granularity on purpose: OfferBiu only exposes a
+    #     batch-level sourceUpdatedAt, so a fake HH:MM would overstate precision.
+    #   * deadline_text keeps the raw wording ("尽快投递", "长期有效") because that
+    #     is the only deadline information many announcements carry.
+    publish_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    deadline_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    deadline_text: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     @validates("internship_seasons")
     def _validate_internship_seasons(self, _key: str, value: Any) -> list[str] | None:

@@ -15,14 +15,14 @@ Design notes:
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import select
 
-from packages.storage import JobEvent, Storage, WatchRule
+from packages.storage import JobEvent, JobSnapshot, Storage, WatchRule
 
 DEFAULT_WINDOW = "today"
 VALID_WINDOWS = ("today", "3d", "7d", "30d")
@@ -148,6 +148,10 @@ class WatchHit:
     detail_url: str
     detected_at: str
     matched: tuple[str, ...] = ()
+    #: Application window from the job snapshot; "" = the source did not say.
+    publish_date: str = ""
+    deadline_date: str = ""
+    deadline_text: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -160,6 +164,9 @@ class WatchHit:
             "detail_url": self.detail_url,
             "detected_at": self.detected_at,
             "matched": list(self.matched),
+            "publish_date": self.publish_date,
+            "deadline_date": self.deadline_date,
+            "deadline_text": self.deadline_text,
         }
 
 
@@ -357,6 +364,7 @@ def run_watch(
     # Exact title hits first; synonyms are kept but ranked below.  Python's sort
     # is stable, so recency order survives inside each group.
     hits.sort(key=lambda hit: any("近义" in reason for reason in hit.matched))
+    hits = _attach_windows(storage, hits[:limit]) + hits[limit:]
     return WatchResult(
         window=(window or DEFAULT_WINDOW),
         since=since.isoformat(),
@@ -373,6 +381,40 @@ def run_watch(
         hits=tuple(hits[:limit]),
         by_company=by_company[:15],
     )
+
+
+def _attach_windows(storage: Storage, hits: Sequence[WatchHit]) -> list[WatchHit]:
+    """Copy publish/deadline dates onto the hits that will actually be shown.
+
+    Only the returned page is enriched: loading a snapshot per event would read
+    the whole catalog, and the event log does not carry the application window.
+    """
+
+    if not hits:
+        return []
+    job_ids = [hit.job_id for hit in hits if hit.job_id]
+    windows: dict[str, tuple[str, str, str]] = {}
+    with storage.session() as session:
+        for snapshot in session.scalars(
+            select(JobSnapshot).where(JobSnapshot.id.in_(job_ids))
+        ).all():
+            windows[snapshot.id] = (
+                snapshot.publish_date.isoformat() if snapshot.publish_date else "",
+                snapshot.deadline_date.isoformat() if snapshot.deadline_date else "",
+                snapshot.deadline_text or "",
+            )
+    enriched: list[WatchHit] = []
+    for hit in hits:
+        published, closes, wording = windows.get(hit.job_id, ("", "", ""))
+        enriched.append(
+            replace(
+                hit,
+                publish_date=published,
+                deadline_date=closes,
+                deadline_text=wording,
+            )
+        )
+    return enriched
 
 
 def latest_event_at(storage: Storage) -> str | None:
