@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -104,6 +105,16 @@ def _merge_scope(presets: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, 
             if word not in keywords:
                 keywords.append(word)
     return (), tuple(keywords), " + ".join(labels)
+
+
+def pad_display(text: str, width: int) -> str:
+    """Left-align by terminal width, not by character count.
+
+    中文是双宽字符，``f"{name:<18}"`` 会按字符数补空格，表格就会参差不齐。
+    """
+
+    used = sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in text)
+    return text + " " * max(0, width - used)
 
 
 def _text(value: Any) -> str:
@@ -213,12 +224,34 @@ def build_parser() -> argparse.ArgumentParser:
         "--types", nargs="+", default=list(DEFAULT_TYPES),
         help="招聘类型：实习 / 秋招 / 春招（可多选）",
     )
+    parser.add_argument(
+        "--list-companies", action="store_true",
+        help="只按公司分组列出会采到什么，不写库（配合 --only-companies 使用）",
+    )
+    parser.add_argument(
+        "--only-companies", default=None,
+        help="只入库这些公司（逗号分隔，按公司名包含匹配），其余丢弃",
+    )
     parser.add_argument("--max-pages", type=int, default=300, help="每种类型最多拉取页数")
     parser.add_argument("--delay", type=float, default=0.2, help="每页间隔秒数")
     parser.add_argument("--limit-print", type=int, default=30, help="报告里最多列多少条新增")
     parser.add_argument("--dry-run", action="store_true", help="只统计，不写库")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出结果")
     return parser
+
+
+def company_groups(items: list[dict[str, Any]]) -> list[tuple[str, list[dict[str, Any]]]]:
+    """Group postings by company, most postings first.
+
+    The wizard shows this list before importing so the reader can drop
+    companies they do not want, and the CLI prints it for ``--list-companies``.
+    """
+
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for item in items:
+        name = _text(item.get("companyName")) or "（公司名缺失）"
+        groups.setdefault(name, []).append(item)
+    return sorted(groups.items(), key=lambda pair: (-len(pair[1]), pair[0]))
 
 
 def preset_matches(item: dict[str, Any]) -> tuple[str, ...]:
@@ -241,6 +274,7 @@ def collect_window(
     city: str = "",
     cohort: int = 0,
     role_match: bool = False,
+    only_companies: tuple[str, ...] = (),
     recruit_types: tuple[str, ...] = DEFAULT_TYPES,
     max_pages: int = 300,
     delay: float = 0.2,
@@ -290,6 +324,17 @@ def collect_window(
         for key in preset_matches(item):
             by_preset[key] = by_preset.get(key, 0) + 1
 
+    if only_companies:
+        wanted_names = tuple(name.casefold() for name in only_companies if name)
+        scoped = [
+            item
+            for item in scoped
+            if any(
+                wanted in str(item.get("companyName") or "").casefold()
+                for wanted in wanted_names
+            )
+        ]
+
     payload: dict[str, Any] = {
         "window": {"start": start.isoformat(), "end": end.isoformat()},
         "fetched": len(postings),
@@ -299,6 +344,7 @@ def collect_window(
         "city": city,
         "cohort": cohort,
         "role_match": bool(role_match),
+        "only_companies": list(only_companies),
         "matched": len(scoped),
         "matched_by": reasons,
         "by_preset": by_preset,
@@ -321,24 +367,39 @@ def collect_window(
         ]
         return payload
 
+    payload.update(ingest_postings(scoped, limit_print=limit_print))
+    return payload
+
+
+def ingest_postings(
+    postings: list[dict[str, Any]], *, limit_print: int = 30
+) -> dict[str, Any]:
+    """Write already-scoped postings into the local database.
+
+    Split out from :func:`collect_window` so the wizard can show the company
+    list first and import only what the reader picked — the fetch and the write
+    are two separate decisions now.
+    """
+
     settings = get_settings()
     storage = Storage.from_url(settings.database_url, initialize=True)
-    result = ingest_offerbiu_postings(storage, scoped, record_events=True)
-    payload["result"] = result.to_dict()
-    payload["new_jobs"] = [
-        {
-            "company": _text(item.get("companyName")),
-            "types": _text(item.get("recruitType")),
-            "publish": announcement_publish_date(item).isoformat()
-            if announcement_publish_date(item)
-            else "",
-            "deadline": _deadline_label(item),
-            "positions": _short(item.get("positionsText"), 80),
-            "url": _text(item.get("applyUrl")) or _text(item.get("announcementUrl")),
-        }
-        for item in scoped[:limit_print]
-    ]
-    return payload
+    result = ingest_offerbiu_postings(storage, postings, record_events=True)
+    return {
+        "result": result.to_dict(),
+        "new_jobs": [
+            {
+                "company": _text(item.get("companyName")),
+                "types": _text(item.get("recruitType")),
+                "publish": announcement_publish_date(item).isoformat()
+                if announcement_publish_date(item)
+                else "",
+                "deadline": _deadline_label(item),
+                "positions": _short(item.get("positionsText"), 80),
+                "url": _text(item.get("applyUrl")) or _text(item.get("announcementUrl")),
+            }
+            for item in postings[:limit_print]
+        ],
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -355,6 +416,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.keywords:
         keywords = tuple(part.strip() for part in args.keywords.split(",") if part.strip())
 
+    only_companies = tuple(
+        part.strip() for part in (args.only_companies or "").split(",") if part.strip()
+    )
     try:
         payload = collect_window(
             start=start,
@@ -363,6 +427,7 @@ def main(argv: list[str] | None = None) -> int:
             keywords=keywords,
             city=args.city,
             cohort=args.cohort,
+            only_companies=only_companies,
             role_match=(
                 get_settings().offerbiu_collect_role_match
                 if args.role_match is None
@@ -371,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
             recruit_types=tuple(args.types),
             max_pages=args.max_pages,
             delay=args.delay,
-            dry_run=args.dry_run,
+            dry_run=args.dry_run or args.list_companies,
             limit_print=args.limit_print,
         )
     except OfferBiuError as exc:
@@ -407,6 +472,21 @@ def main(argv: list[str] | None = None) -> int:
         f"命中 {payload['matched']} 条（行业 {payload['matched_by']['group']} / "
         f"关键词扩展 {payload['matched_by']['keyword']}）"
     )
+    if args.list_companies:
+        groups = company_groups(payload.get("items") or [])
+        print("")
+        print(f"按公司分组（共 {len(groups)} 家，未写库）：")
+        for index, (name, rows) in enumerate(groups, 1):
+            deadline = _deadline_label(rows[0])
+            print(
+                f"  {index:>3}. {pad_display(name, 24)} {len(rows):>2} 条   "
+                f"截止 {pad_display(deadline, 12)} {_short(rows[0].get('positionsText'), 34)}"
+            )
+        print("")
+        print("挑好之后加 --only-companies 公司名（逗号分隔）再跑一次，例如：")
+        print("  python scripts/collect_recent.py --only-companies 郑商所,许昌")
+        return 0
+
     if args.dry_run:
         print("预演模式：没有写库。去掉 --dry-run 才会导入。")
         rows = payload.get("sample") or []

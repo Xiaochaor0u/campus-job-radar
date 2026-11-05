@@ -26,8 +26,13 @@ if str(ROOT) not in sys.path:
 from packages.intelligence.offerbiu_source import CST, OfferBiuError  # noqa: E402
 from packages.job_filters import selected_place_label  # noqa: E402
 from scripts.collect_recent import (  # noqa: E402
+    _deadline_label,
+    pad_display,
     _merge_scope,
+    _short,
     collect_window,
+    company_groups,
+    ingest_postings,
 )
 
 SITE_BASE = "http://127.0.0.1:8010"
@@ -123,41 +128,33 @@ def _print_header() -> None:
     print(LINE)
 
 
-def _ask_questions() -> tuple[tuple[str, ...], int, str, bool]:
+def _ask_questions() -> tuple[tuple[str, ...], int, str]:
     print("")
-    print("第 1 步／共 4 步：想看哪个方向？")
+    print("第 1 步／共 3 步：想看哪个方向？")
     print("  1) 计算机类 —— 算法、开发、测试、运维、数据…")
     print("  2) 材料类   —— 材料、化工、电池、冶金、封装…")
     print("  3) 两者都要")
     scope_raw = _ask("请输入 1 / 2 / 3（直接回车＝两者都要）：", default="3", valid={"1", "2", "3"})
 
     print("")
-    print("第 2 步／共 4 步：想看最近多久发布的？")
+    print("第 2 步／共 3 步：想看最近多久发布的？")
     print("  1) 只今天        2) 最近 3 天")
     print("  3) 最近 7 天     4) 最近 30 天")
     window_raw = _ask("请输入 1-4（直接回车＝最近 7 天）：", default="3", valid={"1", "2", "3", "4"})
 
     print("")
-    print("第 3 步／共 4 步：只看某个城市的岗位吗？")
+    print("第 3 步／共 3 步：只看某个城市的岗位吗？")
     print("  直接回车＝全国；也可以写城市名，比如 郑州、洛阳（多个用顿号分隔）")
     city = _ask_text("请输入城市（直接回车＝全国）：")
 
-    print("")
-    print("第 4 步／共 4 步：采到之后做什么？")
-    print("  1) 直接加进网站（推荐）")
-    print("  2) 先看看有哪些，暂时不加")
-    mode_raw = _ask("请输入 1 / 2（直接回车＝直接加进网站）：", default="1", valid={"1", "2"})
-
-    return resolve_scope(scope_raw), resolve_days(window_raw), city, mode_raw == "2"
+    return resolve_scope(scope_raw), resolve_days(window_raw), city
 
 
-def _render_result(payload: dict[str, Any], presets: tuple[str, ...]) -> None:
+def _print_fetch_summary(payload: dict[str, Any]) -> None:
     today = datetime.now(CST).date()
     window = payload["window"]
-    label = WINDOW_LABELS.get(
-        (date.fromisoformat(window["end"]) - date.fromisoformat(window["start"])).days + 1,
-        7,
-    )
+    days = (date.fromisoformat(window["end"]) - date.fromisoformat(window["start"])).days + 1
+    label = WINDOW_LABELS.get(days, f"最近 {days} 天")
     print("")
     print("采集完成")
     print(
@@ -165,18 +162,72 @@ def _render_result(payload: dict[str, Any], presets: tuple[str, ...]) -> None:
         f"其中 {payload['matched']} 条是你要的方向"
     )
 
-    if payload["dry_run"]:
-        rows = payload.get("sample") or []
-        if not rows:
-            print("  这个时间段里没有匹配的新公告。可以把时间范围放宽到 7 天或 30 天再试。")
-            return
-        print(f"  下面是前 {len(rows)} 条（没有写进网站）：")
-        _print_rows(rows, today)
-        return
 
+def _print_company_list(groups: list[tuple[str, list[dict[str, Any]]]]) -> None:
+    """公司清单：先看质量，再决定入库哪些。"""
+
+    print("")
+    print(f"  来自 {len(groups)} 家公司（按岗位数排序）：")
+    shown = groups[:30]
+    for index, (name, rows) in enumerate(shown, 1):
+        first = rows[0]
+        deadline = _deadline_label(first)
+        print(
+            f"   {index:>2}. {pad_display(name, 24)} {len(rows):>2} 条"
+            f"  截止 {pad_display(deadline, 12)} {_short(first.get('positionsText'), 30)}"
+        )
+    if len(groups) > len(shown):
+        print(f"   …… 后面还有 {len(groups) - len(shown)} 家，输入编号时仍然可以选到")
+
+
+def _parse_selection(raw: str, total: int) -> list[int]:
+    """解析 "1,3,5-7"；空串＝什么都不选。"""
+
+    picked: list[int] = []
+    for part in re.split(r"[,，\s]+", raw.strip()):
+        if not part:
+            continue
+        if "-" in part:
+            left, _, right = part.partition("-")
+            if left.isdigit() and right.isdigit():
+                picked.extend(range(int(left), int(right) + 1))
+            continue
+        if part.isdigit():
+            picked.append(int(part))
+    return sorted({index for index in picked if 1 <= index <= total})
+
+
+def _ask_which_companies(groups: list[tuple[str, list[dict[str, Any]]]]) -> list[int]:
+    """返回要入库的公司序号（1 起）；返回空列表＝不入库。"""
+
+    print("")
+    print("这些要加进网站吗？")
+    print("  1) 全部加进去")
+    print("  2) 只挑几家公司（输入上面的编号）")
+    print("  3) 都不加，先看看")
+    mode = _ask("请输入 1 / 2 / 3（直接回车＝全部加进去）：", default="1", valid={"1", "2", "3"})
+    if mode == "3":
+        return []
+    if mode == "1":
+        return list(range(1, len(groups) + 1))
+
+    print("")
+    print("输入要加进去的公司编号，比如 1,3,5-7（回车＝都不加）：")
+    raw = _ask_text("编号：")
+    picked = _parse_selection(raw, len(groups))
+    if not picked:
+        print("  没有选中任何公司，这次不入库。")
+    return picked
+
+
+def _render_ingest(payload: dict[str, Any], picked_companies: int, total_companies: int) -> None:
+    today = datetime.now(CST).date()
     result = payload["result"]
     inserted = int(result.get("inserted") or 0)
     updated = int(result.get("updated") or 0)
+    print("")
+    if picked_companies < total_companies:
+        print(f"入库范围：{picked_companies}/{total_companies} 家公司")
     if inserted == 0 and updated == 0:
         print("  没有新岗位：库里已经都有这些公告了。")
         print("  这不是故障——企业没发新公告，采多少次都不会多出来。")
@@ -188,9 +239,6 @@ def _render_result(payload: dict[str, Any], presets: tuple[str, ...]) -> None:
         print("")
         print("  新增的岗位（在网站里点岗位名就能打开投递页）：")
         _print_rows(rows, today)
-        if payload["matched"] > len(rows):
-            print("")
-            print(f"  ……还有 {payload['matched'] - len(rows)} 条没列出来，打开网站能看全。")
 
 
 def _unique_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -255,11 +303,11 @@ def main(argv: list[str] | None = None) -> int:
 
     _print_header()
     if args.defaults:
-        presets, days, city, dry_run = ("cs", "materials"), 7, "", False
+        presets, days, city = ("cs", "materials"), 7, ""
         print("（已按默认设置运行：计算机类 + 材料类，最近 7 天）")
     else:
         try:
-            presets, days, city, dry_run = _ask_questions()
+            presets, days, city = _ask_questions()
         except (KeyboardInterrupt, EOFError):
             print("\n已取消，什么都没有改。")
             return 1
@@ -286,14 +334,15 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.flush()
 
     try:
+        # 先只拉取、不写库：看完公司清单再决定入库哪些。
         payload = collect_window(
             start=start,
             end=end,
             groups=(),
             keywords=keywords,
             city=city,
-            dry_run=dry_run,
-            progress=_show_progress
+            dry_run=True,
+            progress=_show_progress,
         )
     except OfferBiuError as exc:
         print("")
@@ -307,12 +356,47 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write("\r" + " " * 40 + "\r")
         sys.stdout.flush()
 
-    _render_result(payload, presets)
+    _print_fetch_summary(payload)
 
-    if not args.defaults and not dry_run:
+    groups = company_groups(payload.get("items") or [])
+    if not groups:
+        print("  这个时间段里没有匹配的新公告。可以把时间范围放宽到 7 天或 30 天再试。")
+        return 0
+
+    _print_company_list(groups)
+
+    if args.defaults:
+        picked = list(range(1, len(groups) + 1))
+    else:
+        try:
+            picked = _ask_which_companies(groups)
+        except (KeyboardInterrupt, EOFError):
+            print("\n已取消，本次什么都没有写入。")
+            return 1
+
+    if not picked:
+        print("")
+        print("  这次没有入库，网站保持原样。下次想入库，重新双击这个文件即可。")
+        return 0
+
+    chosen = [item for index in picked for item in groups[index - 1][1]]
+    try:
+        payload.update(ingest_postings(chosen))
+    except Exception as exc:  # noqa: BLE001 - 数据库问题要说清楚，不能静默
+        print("")
+        print(f"  写入数据库失败：{exc}")
+        return 2
+
+    _render_ingest(payload, len(picked), len(groups))
+
+    if not args.defaults:
         print("")
         if site_is_up():
-            answer = _ask("要看网页版吗？ 1) 打开  2) 不用（回车＝打开）：", default="1", valid={"1", "2"})
+            try:
+                answer = _ask("要看网页版吗？ 1) 打开  2) 不用（回车＝打开）：", default="1", valid={"1", "2"})
+            except (EOFError, KeyboardInterrupt):
+                # 非交互运行（管道/计划任务）时没有输入，当作"不用"。
+                answer = "2"
             if answer == "1":
                 _open_site()
         else:
