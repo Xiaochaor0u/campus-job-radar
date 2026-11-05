@@ -349,6 +349,67 @@ python scripts\collect_recent.py --days 7 --dry-run
 
 脚本写的是**同一个本地数据库**，跑完直接刷新 <http://127.0.0.1:8010/?view=intelligence> 就能看到，不需要再导入。
 
+### ⓪-C 不只 OfferBiu：直采企业官网 / 导入外部岗位
+
+上面的按钮和脚本读的是 OfferBiu（一个校招公告聚合站）。它是很好的底座，但只有它一个来源，
+就意味着"它没收的公告，你这里也没有"。所以有两条补充通道：
+
+**A. 直采企业招聘系统**（自动，推荐）
+
+```text
+# 看看哪些公司能直采
+python scripts\crawl_company_sites.py --list
+
+# 抓这两家（已内置，河南本地）
+python scripts\crawl_company_sites.py --company shuanghui,cmoc
+
+# 所有已接入的公司
+python scripts\crawl_company_sites.py --connected
+```
+
+支持四类主流招聘系统，加公司只需在 `config/companies.yaml` 里写一行域名：
+
+| 招聘页长这样 | crawler | 说明 |
+| --- | --- | --- |
+| `xxx.zhiye.com` | `beisen` | 北森，大厂/国企常见 |
+| `wecruit.hotjob.cn/SUxxxx/...` | `hotjob` | 北森热招门户 |
+| `app.mokahr.com/campus-recruitment/xxx/12345` | `moka` | Moka |
+| `xxx.jobs.feishu.cn/campus` | `feishu` | 飞书招聘 |
+
+脚本只收**校招/实习**：官网热招里的"电气维修工"这类社招岗会被跳过（`--all` 可强制全收），
+岗位标题里的"27 届"会写进届别。
+
+**B. 导入外部岗位**（任何来源，手工/半自动）
+
+高校就业网、集团公告、别的聚合站——只要整理成 JSON/CSV 就能进来，**每条必须带 URL**：
+
+```text
+python scripts\import_jobs.py --file .data/incoming/zz.json --dry-run   # 先预览
+python scripts\import_jobs.py --file .data/incoming/zz.json             # 再入库
+```
+
+```json
+{
+  "source": "company-site",
+  "items": [
+    {"company": "郑州商品交易所", "title": "软件研发岗", "city": "郑州",
+     "url": "https://www.czce.com.cn/...", "published_at": "2026-11-01",
+     "deadline": "2026-11-20", "track": "campus", "cohort": 2027}
+  ]
+}
+```
+
+入库后在「全部岗位」里能看到来源标签：`招聘公告`（OfferBiu）/ `官网直采`（企业系统）/ `外部来源`。
+
+**哪些站点能自动爬、哪些不能**（2026-11 实测）：
+
+| 来源 | 状态 |
+| --- | --- |
+| OfferBiu 公开接口 | ✅ 直接可用 |
+| 北森 / hotjob / Moka / 飞书 招聘页 | ✅ 可用（需知道公司域名） |
+| 高校就业网（郑大等） | ⚠️ 列表页是 JS 渲染，要逆向接口 |
+| BOSS 直聘 / 智联 / 51job / 职友集 | ❌ 登录 + 反爬，不做 |
+
 ### ① 岗位变化
 
 - 顶部四个数字：新发布 / 内容变更 / 已下架 / 有变化的企业
@@ -776,15 +837,15 @@ python scripts\export_seed.py
 
 - **采集层**：Requests / Playwright / BeautifulSoup，79 个站点适配器（57 个真实实现，18 个占位）
 - **应用层**：FastAPI + 原生 HTML/CSS/JS（无前端构建）
-- **情报层**：`packages/intelligence/` —— 事件写入、日报聚合、群机器人推送、OfferBiu 公告导入
+- **情报层**：`packages/intelligence/` —— 事件写入、日报聚合、群机器人推送、多源岗位导入（OfferBiu / 官网直采 / 外部 JSON）
 - **调度层**：本地任务调度器 + Windows 计划任务 / cron，6 个固定任务
 - **数据层**：SQLAlchemy 2.0，SQLite（默认）/ PostgreSQL 16，迁移在 `migrations/`
 
 ### 数据流
 
 ```
-企业官网 / OfferBiu 公告
-        ↓  定时任务
+OfferBiu 公告 / 企业招聘系统 / 外部导入（JSON、CSV）
+        ↓  定时任务或手动脚本
    job_snapshots（岗位快照）
         ↓  与上一轮对比
    job_events（新增/变更/下架事件）
@@ -868,6 +929,7 @@ python -m pytest tests/test_intelligence.py tests/test_intelligence_api.py tests
 | 历史数据回填 | `backfill_application_window.py` 从老数据里补出 22322 条截止文字、3117 个截止日期 |
 | 前端超时保护 | 所有请求 45 秒超时并给出明确提示，不再有无限加载；静态资源加版本号，避免浏览器缓存旧 JS 导致"改了不起作用" |
 | 双击入口 | 新增 `一键启动.bat` / `一键采集.bat`（macOS 为 `.command`）；采集是三步选择题，全程中文提示，跑完停在窗口里不闪退 |
+| 多源采集 | 新增「官网直采」：直接读企业招聘系统（北森 / hotjob / Moka / 飞书），只收校招与实习；新增「外部导入」：任何来源整理成 JSON/CSV 即可入库，每条必须带 URL。已接入双汇、洛阳钼业，实测入库 18 条 |
 | 先看后入库 | 一键采集改成"先拉取、列公司、再入库"：可全部、可只挑几家（输入编号），也可都不入库；命令行对应 `--list-companies` / `--only-companies` |
 | 表格列宽 | 全部岗位改为 8 列并分配宽度，「画像」列不再被挤出可视区 |
 | 页面合并 | 「今日新发布」与「每日新增」合成一个「岗位变化」页：筛选条直接作用于变化列表，指标卡与列表同口径；订阅胶囊一键套用 |

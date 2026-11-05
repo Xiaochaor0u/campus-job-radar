@@ -6862,12 +6862,23 @@
   }
 
   const INTEL_JOB_TRACK_LABELS = { campus: "校招", internship: "实习", social: "社招", unknown: "—" };
-  const INTEL_SOURCE_LABELS = { offerbiu: "招聘公告", "recruitops-agent.daily_pipeline": "官网采集" };
+  const INTEL_SOURCE_LABELS = {
+    offerbiu: "招聘公告",
+    "recruitops-agent.daily_pipeline": "官网采集",
+    // 直接读企业招聘系统（北森/hotjob/Moka/飞书）的岗位
+    "company-site": "官网直采",
+    // 从别处核实后导入的岗位（高校就业网、集团公告等）
+    web: "外部来源",
+  };
   let intelJobPage = 1;
   let intelJobsLoaded = false;
 
   function intelCompanyLabel(companyId) {
-    return String(companyId || "").replace(/^offerbiu:/, "");
+    const raw = String(companyId || "");
+    // company_id 形如 "offerbiu:腾讯" / "company-site:双汇发展"，
+    // 冒号前是来源，不是公司名的一部分。
+    const cut = raw.indexOf(":");
+    return cut > 0 && cut < 32 ? raw.slice(cut + 1) : raw;
   }
 
   // --- 岗位画像：点一条岗位再分析，不预先算全库 ---------------------------
