@@ -5921,3 +5921,5 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
 .intel-collect-place .search-field { flex: 0 1 260px; min-width: 170px; }
 .intel-collect-place .intel-collect-cohort { display: inline-flex; align-items: center; gap: 6px; }
 .intel-collect-place .intel-collect-cohort select { min-width: 116px; }
+/* 「同时按岗位名判断方向」是口径开关，单独一行、左对齐 */
+.intel-collect-role { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 2px; }

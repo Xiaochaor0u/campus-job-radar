@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from packages.industry_scope import matches_industry_scope
+from packages.industry_scope import matches_industry_scope, matches_role_scope
 from packages.job_filters import matches_city, matches_cohort
 from packages.intelligence.offerbiu_source import (
     CST,
@@ -105,6 +105,7 @@ class _Collector:
         days: int = 7,
         city: str = "",
         cohort: int = 0,
+        role_match: bool = False,
     ) -> dict[str, Any]:
         groups = tuple(dict.fromkeys(str(code) for code in industry_groups))
         types = tuple(dict.fromkeys(str(value) for value in recruit_types))
@@ -121,6 +122,7 @@ class _Collector:
             raise ValueError("届别需要是年份，例如 2027") from exc
         if cohort < 0 or cohort > 2100:
             raise ValueError("届别需要是 4 位年份")
+        role_match = bool(role_match)
         with self._lock:
             if self._status.get("running"):
                 raise CollectionAlreadyRunning("采集正在进行中")
@@ -137,6 +139,7 @@ class _Collector:
                     "days": days,
                     "city": city,
                     "cohort": cohort,
+                    "role_match": role_match,
                 },
                 "result": None,
                 "error": "",
@@ -144,7 +147,7 @@ class _Collector:
             snapshot = dict(self._status)
             self._thread = threading.Thread(
                 target=self._run,
-                args=(storage, groups, types, max_pages_per_type, days, city, cohort),
+                args=(storage, groups, types, max_pages_per_type, days, city, cohort, role_match),
                 name="offerbiu-manual-collect",
                 daemon=True,
             )
@@ -181,6 +184,7 @@ class _Collector:
         days: int,
         city: str = "",
         cohort: int = 0,
+        role_match: bool = False,
     ) -> None:
         try:
             # Only the window the user asked for: the feed is date-ordered, so
@@ -201,7 +205,10 @@ class _Collector:
                 for item in postings
                 if matches_city(item, city)
                 and matches_cohort(item, cohort)
-                and matches_industry_scope(item, groups)
+                and (
+                    matches_industry_scope(item, groups)
+                    or (role_match and matches_role_scope(item, groups))
+                )
             ]
             self._update(
                 phase="ingesting",
@@ -221,6 +228,7 @@ class _Collector:
             payload["days"] = days
             payload["city"] = city
             payload["cohort"] = cohort
+            payload["role_match"] = role_match
             self._update(
                 running=False,
                 phase="done",
@@ -249,6 +257,7 @@ def start_collection(
     days: int = 7,
     city: str = "",
     cohort: int = 0,
+    role_match: bool = False,
 ) -> dict[str, Any]:
     """Start one collection run; raises if another one is still going."""
 
@@ -260,6 +269,7 @@ def start_collection(
         days=days,
         city=city,
         cohort=cohort,
+        role_match=role_match,
     )
 
 

@@ -5,6 +5,7 @@ from packages.industry_scope import (
     MATERIAL_INDUSTRY_CODES,
     expand_industry_codes,
     matches_industry_scope,
+    matches_role_scope,
 )
 
 
@@ -104,3 +105,29 @@ def test_rows_without_industry_tags_never_match():
 
 def test_unknown_group_matches_nothing():
     assert not matches_industry_scope(_item(["internet-tech"], "后端开发"), ["no-such-group"])
+
+
+def test_role_match_catches_it_jobs_at_non_it_companies():
+    """郑商所被标成金融业，但它招软件研发，按岗位看就是计算机岗。"""
+
+    item = _item(["finance"], "软件研发岗、网络安全岗、财务会计岗", "郑州商品交易所集团")
+    assert not matches_industry_scope(item, ["internet-tech"])
+    assert matches_role_scope(item, ["internet-tech"])
+
+
+def test_role_match_ignores_general_management_roles():
+    item = _item(["finance"], "管理培训生、精算及产品开发")
+    assert not matches_role_scope(item, ["internet-tech"])
+
+
+def test_role_match_only_applies_to_selected_groups():
+    """选的是材料，就不该因为岗位名带「算法」把纯软件岗收进来。"""
+
+    item = _item(["internet-tech"], "算法工程师")
+    assert matches_role_scope(item, ["internet-tech"])
+    assert not matches_role_scope(item, ["materials"])
+
+
+def test_role_match_never_matches_a_false_friend():
+    item = _item(["finance"], "自动化工程师")
+    assert not matches_role_scope(item, ["materials"])

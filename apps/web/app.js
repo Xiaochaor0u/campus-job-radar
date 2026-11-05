@@ -6327,12 +6327,14 @@
     const days = Number(picked?.value || 7);
     const city = ($("intel-collect-city")?.value || "").trim();
     const cohort = Number($("intel-collect-cohort")?.value || 0);
+    const roleMatch = Boolean($("intel-collect-role-match")?.checked);
     return {
       groups,
       types,
       days: Number.isFinite(days) && days > 0 ? days : 7,
       city,
       cohort: Number.isFinite(cohort) && cohort > 0 ? cohort : 0,
+      roleMatch,
     };
   }
 
@@ -6382,6 +6384,8 @@
     }
     const cityInput = $("intel-collect-city");
     if (cityInput && !cityInput.value) cityInput.value = options?.selected_city || "";
+    const roleBox = $("intel-collect-role-match");
+    if (roleBox) roleBox.checked = options?.selected_role_match !== false;
     const cohortSelect = $("intel-collect-cohort");
     if (cohortSelect) {
       const current = Number(options?.selected_cohort || 0);
@@ -6532,7 +6536,7 @@
   }
 
   async function startManualCollection() {
-    const { groups, types, days, city, cohort } = collectSelections();
+    const { groups, types, days, city, cohort, roleMatch } = collectSelections();
     if (!groups.length) { showToast("请至少选择一个行业范围，可在「手动采集」面板里勾选", "error"); return; }
     if (!types.length) { showToast("请至少选择一种招聘类型", "error"); return; }
     const button = $("intel-collect-button");
@@ -6544,7 +6548,14 @@
       await api("/api/intelligence/collect", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ industry_groups: groups, recruit_types: types, days, city, cohort }),
+        body: JSON.stringify({
+          industry_groups: groups,
+          recruit_types: types,
+          days,
+          city,
+          cohort,
+          role_match: roleMatch,
+        }),
       });
       // Remember the scope so the next visit starts from the same choices,
       // and so 采集最新岗位 keeps using it without opening the panel.
@@ -6558,6 +6569,7 @@
             offerbiu_collect_days: days,
             offerbiu_collect_city: city,
             offerbiu_collect_cohort: cohort,
+            offerbiu_collect_role_match: roleMatch,
           },
         }),
       }).catch(() => {});
@@ -6585,6 +6597,7 @@
     $("intel-collect-groups")?.addEventListener("change", refreshSummary);
     $("intel-collect-city")?.addEventListener("input", refreshSummary);
     $("intel-collect-cohort")?.addEventListener("change", refreshSummary);
+    $("intel-collect-role-match")?.addEventListener("change", refreshSummary);
   }
 
   function renderIntelligenceBadge(type, count) {

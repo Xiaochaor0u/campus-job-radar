@@ -661,6 +661,7 @@ def intelligence_collect_status() -> dict[str, Any]:
         "selected_days": get_settings().offerbiu_collect_days,
         "selected_city": get_settings().offerbiu_collect_city,
         "selected_cohort": get_settings().offerbiu_collect_cohort,
+        "selected_role_match": get_settings().offerbiu_collect_role_match,
         "cohort_options": [0, 2026, 2027, 2028],
         "industry_groups": [
             {
@@ -737,6 +738,10 @@ def intelligence_collect(payload: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="cohort 需要是年份，例如 2027") from exc
     if cohort < 0 or cohort > 2100:
         raise HTTPException(status_code=422, detail="cohort 需要是 4 位年份")
+    raw_role = body.get("role_match")
+    role_match = (
+        get_settings().offerbiu_collect_role_match if raw_role is None else bool(raw_role)
+    )
 
     try:
         return start_collection(
@@ -746,6 +751,7 @@ def intelligence_collect(payload: dict[str, Any]) -> dict[str, Any]:
             days=days,
             city=city,
             cohort=cohort,
+            role_match=role_match,
         )
     except CollectionAlreadyRunning as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

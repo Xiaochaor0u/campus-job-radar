@@ -196,6 +196,9 @@ class Settings(BaseSettings):
     offerbiu_collect_city: str = Field(default="", max_length=64)
     #: 只看某届（0＝不限届别）。实习不受此限，见 packages/job_filters.py。
     offerbiu_collect_cohort: int = Field(default=0, ge=0, le=2100)
+    #: 除了公司行业标签，还按岗位名判断方向（如郑商所的「软件研发岗」）。
+    #: 关掉就是严格的"只看该公司所属行业"。
+    offerbiu_collect_role_match: bool = True
     offline_reconciliation_enabled: bool = True
     offline_grace_runs: int = 2
     offline_grace_days: float = 3.0

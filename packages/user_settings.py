@@ -10,6 +10,7 @@ CONFIG_FIELDS = frozenset({
     "codex_model_provider_id", "model_provider_name", "model_api_style", "model_name",
     "offerbiu_industry_groups", "offerbiu_collect_days",
     "offerbiu_collect_city", "offerbiu_collect_cohort",
+    "offerbiu_collect_role_match",
     "mail_enabled", "mail_imap_host", "mail_imap_port", "mail_imap_username",
     "mail_imap_password", "mail_imap_mailbox",
     "automation_enabled", "vision_enabled", "mail_sync_on_startup",

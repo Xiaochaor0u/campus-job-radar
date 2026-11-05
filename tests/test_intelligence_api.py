@@ -214,3 +214,9 @@ def test_collect_rejects_an_impossible_cohort(client: TestClient) -> None:
     )
     assert response.status_code == 422
     assert "cohort" in response.json()["detail"]
+
+
+def test_collect_status_exposes_the_role_match_switch(client: TestClient) -> None:
+    response = client.get("/api/intelligence/collect/status")
+    assert response.status_code == 200
+    assert "selected_role_match" in response.json()["options"]

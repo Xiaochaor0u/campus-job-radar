@@ -39,6 +39,7 @@ from packages.config import get_settings  # noqa: E402
 from packages.industry_scope import (  # noqa: E402
     MATERIAL_KEYWORDS,
     matches_industry_scope,
+    matches_role_scope,
 )
 from packages.job_filters import (  # noqa: E402
     cohort_label,
@@ -120,6 +121,7 @@ def _match_reason(
     *,
     groups: frozenset[str],
     keywords: tuple[str, ...],
+    role_match: bool = False,
 ) -> str:
     """Return "group", "keyword" or "" — why this posting is in scope."""
 
@@ -128,7 +130,11 @@ def _match_reason(
         if any(word.casefold() in positions for word in keywords):
             return "keyword"
     # 普通分组比 industryGroupCodes；「材料/新材料」这类组合组还要看岗位名。
-    if groups and matches_industry_scope(item, groups):
+    # role_match 打开时，公司行业对不上但岗位名对得上的也算（郑商所的软件研发岗）。
+    if groups and (
+        matches_industry_scope(item, groups)
+        or (role_match and matches_role_scope(item, groups))
+    ):
         return "group"
     return ""
 
@@ -192,6 +198,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="只看这些城市的岗位，如 郑州 或 郑州,洛阳（默认全国）",
     )
     parser.add_argument(
+        "--role-match", dest="role_match", action="store_true", default=None,
+        help="除公司行业标签外，也按岗位名判断方向（郑商所的软件研发岗也算互联网）",
+    )
+    parser.add_argument(
+        "--no-role-match", dest="role_match", action="store_false",
+        help="严格只按公司行业标签匹配",
+    )
+    parser.add_argument(
         "--cohort", type=int, default=0,
         help="只看某届校招，如 2027（0＝不限；实习不受此限，寒假/日常/春季实习都会收）",
     )
@@ -226,6 +240,7 @@ def collect_window(
     keywords: tuple[str, ...] = (),
     city: str = "",
     cohort: int = 0,
+    role_match: bool = False,
     recruit_types: tuple[str, ...] = DEFAULT_TYPES,
     max_pages: int = 300,
     delay: float = 0.2,
@@ -265,7 +280,9 @@ def collect_window(
     reasons: dict[str, int] = {"group": 0, "keyword": 0}
     by_preset: dict[str, int] = {key: 0 for key in PRESETS}
     for item in in_cohort:
-        reason = _match_reason(item, groups=group_set, keywords=keywords)
+        reason = _match_reason(
+            item, groups=group_set, keywords=keywords, role_match=role_match
+        )
         if not reason:
             continue
         reasons[reason] += 1
@@ -281,6 +298,7 @@ def collect_window(
         "in_cohort": len(in_cohort),
         "city": city,
         "cohort": cohort,
+        "role_match": bool(role_match),
         "matched": len(scoped),
         "matched_by": reasons,
         "by_preset": by_preset,
@@ -345,6 +363,11 @@ def main(argv: list[str] | None = None) -> int:
             keywords=keywords,
             city=args.city,
             cohort=args.cohort,
+            role_match=(
+                get_settings().offerbiu_collect_role_match
+                if args.role_match is None
+                else args.role_match
+            ),
             recruit_types=tuple(args.types),
             max_pages=args.max_pages,
             delay=args.delay,

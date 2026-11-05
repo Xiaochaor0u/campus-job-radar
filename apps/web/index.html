@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f7ff">
     <title>秋招工作台 | RecruitOps Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261105-10">
-    <script defer src="./app.js?v=intel-ui-20261105-10"></script>
-    <script defer src="./company-sources.js?v=intel-ui-20261105-10"></script>
-    <script defer src="./configuration.js?v=intel-ui-20261105-10"></script>
+    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261105-11">
+    <script defer src="./app.js?v=intel-ui-20261105-11"></script>
+    <script defer src="./company-sources.js?v=intel-ui-20261105-11"></script>
+    <script defer src="./configuration.js?v=intel-ui-20261105-11"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -294,6 +294,8 @@
                 <p class="muted-label">行业范围（决定采集哪些行业的公告）：</p>
                 <div class="intel-collect-groups" id="intel-collect-groups"></div>
                 <p class="muted-label collect-panel-note" id="intel-collect-group-hint" hidden></p>
+                <label class="intel-check intel-collect-role" for="intel-collect-role-match"><input type="checkbox" id="intel-collect-role-match"> 同时按岗位名判断方向（不限公司行业）</label>
+                <p class="muted-label collect-panel-note">勾上后，郑州商品交易所的「软件研发岗」、许昌继电器的「嵌入式软件研发」这类也会算进来；取消就严格只按公司行业标签。</p>
                 <p class="muted-label">工作地点（留空＝全国，可写多个城市用顿号分隔）：</p>
                 <div class="intel-collect-place">
                   <label class="search-field" for="intel-collect-city"><span class="sr-only">城市</span><input id="intel-collect-city" type="text" list="intel-city-options" placeholder="例如：郑州" autocomplete="off"></label>

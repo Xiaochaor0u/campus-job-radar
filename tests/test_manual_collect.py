@@ -186,6 +186,33 @@ def test_city_and_cohort_narrow_the_rows(monkeypatch):
     assert status["result"]["in_scope"] == 2
 
 
+def test_role_match_controls_the_cross_industry_reading(monkeypatch):
+    """同一批数据：关掉只看公司行业，打开才收「金融公司的软件岗」。"""
+
+    rows = [
+        {"companyName": "郑州商品交易所", "industryGroupCodes": ["finance"],
+         "locations": ["郑州"], "targetYears": [2027], "recruitType": "秋招",
+         "positionsText": "软件研发岗、网络安全岗、财务会计岗"},
+    ]
+
+    captured = _patch_scope(monkeypatch, rows)
+    manual_collect.start_collection(
+        object(), industry_groups=["internet-tech"], recruit_types=["秋招"],
+        city="郑州", role_match=False,
+    )
+    _wait_for_result()
+    assert captured["ingested"] == []
+
+    captured = _patch_scope(monkeypatch, rows)
+    manual_collect.start_collection(
+        object(), industry_groups=["internet-tech"], recruit_types=["秋招"],
+        city="郑州", role_match=True,
+    )
+    status = _wait_for_result()
+    assert captured["ingested"] == ["郑州商品交易所"]
+    assert status["scope"]["role_match"] is True
+
+
 def test_invalid_cohort_is_rejected():
     with pytest.raises(ValueError, match="届别"):
         manual_collect.start_collection(
