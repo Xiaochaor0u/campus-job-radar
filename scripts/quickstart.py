@@ -17,8 +17,11 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import socket
 import subprocess
 import sys
+import urllib.request
+import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +66,30 @@ def _job_count() -> int:
         return int(session.query(JobSnapshot).count())
 
 
+def port_in_use(host: str, port: int) -> bool:
+    """Is something already listening on this port?"""
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.5)
+        return probe.connect_ex((host, port)) == 0
+
+
+def site_already_running(host: str, port: int) -> bool:
+    """Is the workbench itself answering on this port?
+
+    Double-clicking the launcher twice is the most common way to hit this:
+    the second copy would fail with "address already in use" and look broken,
+    while the site is in fact already up.
+    """
+
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(f"http://{host}:{port}/api/intelligence/coverage", timeout=2) as response:
+            return int(getattr(response, "status", response.getcode())) == 200
+    except Exception:  # noqa: BLE001 - any failure means "not our site"
+        return False
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     _prepare_config()
@@ -105,6 +132,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     url = f"http://{args.host}:{args.port}/?view=intelligence"
+
+    if site_already_running(args.host, args.port):
+        print(f"工作台已经在运行：{url}")
+        print("已为你打开浏览器；要重启，先关掉原来那个窗口再运行一次。")
+        try:
+            webbrowser.open(url)
+        except Exception:  # noqa: BLE001 - 打不开浏览器不影响提示
+            pass
+        return 0
+    if port_in_use(args.host, args.port):
+        print(f"端口 {args.port} 被别的程序占用了。换一个端口：")
+        print(f"  python scripts/quickstart.py --port {args.port + 10}")
+        return 1
+
     print(f"启动工作台：{url}（Ctrl+C 停止）")
     try:
         subprocess.run(

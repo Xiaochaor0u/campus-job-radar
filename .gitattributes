@@ -1,0 +1,9 @@
+# Launchers must keep their native line endings or they break in confusing ways:
+#   * .bat is read by cmd.exe, which tolerates CRLF (and mis-renders bare LF in
+#     some Windows builds) — so force CRLF.
+#   * .command / .sh is read by bash; a CRLF shebang fails with
+#     "bad interpreter: /bin/bash^M", so force LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.command text eol=lf
+*.sh text eol=lf

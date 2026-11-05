@@ -198,9 +198,114 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def preset_matches(item: dict[str, Any]) -> tuple[str, ...]:
+    """Which presets this posting belongs to — used for friendly summaries."""
+
+    positions = _positions(item)
+    return tuple(
+        key
+        for key, preset in PRESETS.items()
+        if any(word.casefold() in positions for word in preset["keywords"])
+    )
+
+
+def collect_window(
+    *,
+    start: date,
+    end: date,
+    groups: tuple[str, ...] = (),
+    keywords: tuple[str, ...] = (),
+    recruit_types: tuple[str, ...] = DEFAULT_TYPES,
+    max_pages: int = 300,
+    delay: float = 0.2,
+    dry_run: bool = False,
+    limit_print: int = 30,
+    progress: Any = None,
+) -> dict[str, Any]:
+    """Fetch one window, filter it, and (unless ``dry_run``) write it to the database.
+
+    Both the CLI and the double-click wizard call this, so the two entry points
+    can never drift apart in how they decide what counts as "in scope".
+    """
+
+    log = progress or (lambda message: print(message, file=sys.stderr))
+    postings = fetch_offerbiu_postings(
+        recruit_types=tuple(recruit_types),
+        max_pages_per_type=max_pages,
+        delay_seconds=delay,
+        # The feed is date-ordered: stop at the window edge instead of reading
+        # all ~450 pages, most of which are older than the window.
+        stop_before=start,
+        logger=log,
+    )
+
+    in_window: list[dict[str, Any]] = []
+    for item in postings:
+        published = announcement_publish_date(item)
+        if published is not None and start <= published <= end:
+            in_window.append(item)
+
+    group_set = frozenset(groups)
+    scoped: list[dict[str, Any]] = []
+    reasons: dict[str, int] = {"group": 0, "keyword": 0}
+    by_preset: dict[str, int] = {key: 0 for key in PRESETS}
+    for item in in_window:
+        reason = _match_reason(item, groups=group_set, keywords=keywords)
+        if not reason:
+            continue
+        reasons[reason] += 1
+        scoped.append(item)
+        for key in preset_matches(item):
+            by_preset[key] = by_preset.get(key, 0) + 1
+
+    payload: dict[str, Any] = {
+        "window": {"start": start.isoformat(), "end": end.isoformat()},
+        "fetched": len(postings),
+        "in_window": len(in_window),
+        "matched": len(scoped),
+        "matched_by": reasons,
+        "by_preset": by_preset,
+        "dry_run": bool(dry_run),
+        "items": scoped,
+    }
+
+    if dry_run:
+        payload["sample"] = [
+            {
+                "company": _text(item.get("companyName")),
+                "types": _text(item.get("recruitType")),
+                "publish": announcement_publish_date(item).isoformat()
+                if announcement_publish_date(item)
+                else "",
+                "deadline": _deadline_label(item),
+                "positions": _short(item.get("positionsText"), 60),
+            }
+            for item in scoped[:limit_print]
+        ]
+        return payload
+
+    settings = get_settings()
+    storage = Storage.from_url(settings.database_url, initialize=True)
+    result = ingest_offerbiu_postings(storage, scoped, record_events=True)
+    payload["result"] = result.to_dict()
+    payload["new_jobs"] = [
+        {
+            "company": _text(item.get("companyName")),
+            "types": _text(item.get("recruitType")),
+            "publish": announcement_publish_date(item).isoformat()
+            if announcement_publish_date(item)
+            else "",
+            "deadline": _deadline_label(item),
+            "positions": _short(item.get("positionsText"), 80),
+            "url": _text(item.get("applyUrl")) or _text(item.get("announcementUrl")),
+        }
+        for item in scoped[:limit_print]
+    ]
+    return payload
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    settings = get_settings()
     start, end, window_label = _window_bounds(args)
 
     presets = _preset_keys(args.preset)
@@ -209,81 +314,32 @@ def main(argv: list[str] | None = None) -> int:
         groups = tuple(part.strip() for part in args.groups.split(",") if part.strip())
     if args.keywords:
         keywords = tuple(part.strip() for part in args.keywords.split(",") if part.strip())
-    group_set = frozenset(groups)
-    keyword_tuple = tuple(keywords)
 
     try:
-        postings = fetch_offerbiu_postings(
+        payload = collect_window(
+            start=start,
+            end=end,
+            groups=groups,
+            keywords=keywords,
             recruit_types=tuple(args.types),
-            max_pages_per_type=args.max_pages,
-            delay_seconds=args.delay,
-            # The feed is date-ordered: stop at the window edge instead of
-            # reading all ~450 pages, most of which are older than the window.
-            stop_before=start,
-            logger=lambda message: print(message, file=sys.stderr),
+            max_pages=args.max_pages,
+            delay=args.delay,
+            dry_run=args.dry_run,
+            limit_print=args.limit_print,
         )
     except OfferBiuError as exc:
         print(f"采集失败：{exc}", file=sys.stderr)
         return 2
 
-    in_window: list[dict[str, Any]] = []
-    for item in postings:
-        published = announcement_publish_date(item)
-        if published is None:
-            continue
-        if start <= published <= end:
-            in_window.append(item)
-
-    scoped: list[dict[str, Any]] = []
-    reasons: dict[str, int] = {"group": 0, "keyword": 0}
-    for item in in_window:
-        reason = _match_reason(item, groups=group_set, keywords=keyword_tuple)
-        if reason:
-            reasons[reason] += 1
-            scoped.append(item)
-
-    payload: dict[str, Any] = {
-        "window": {"start": start.isoformat(), "end": end.isoformat(), "label": window_label},
-        "scope": {"label": scope_label, "groups": list(groups), "keywords": list(keywords)},
-        "fetched": len(postings),
-        "in_window": len(in_window),
-        "matched": len(scoped),
-        "matched_by": reasons,
-        "dry_run": bool(args.dry_run),
+    payload["window"]["label"] = window_label
+    payload["scope"] = {
+        "label": scope_label,
+        "groups": list(groups),
+        "keywords": list(keywords),
     }
 
-    if args.dry_run:
-        sample = [
-            {
-                "company": _text(item.get("companyName")),
-                "types": _text(item.get("recruitType")),
-                "publish": announcement_publish_date(item).isoformat(),
-                "deadline": _deadline_label(item),
-                "positions": _short(item.get("positionsText"), 60),
-            }
-            for item in scoped[: args.limit_print]
-        ]
-        payload["sample"] = sample
-    else:
-        storage = Storage.from_url(settings.database_url, initialize=True)
-        result = ingest_offerbiu_postings(storage, scoped, record_events=True)
-        summary = result.to_dict()
-        payload["result"] = summary
-        payload["new_jobs"] = [
-            {
-                "company": _text(item.get("companyName")),
-                "types": _text(item.get("recruitType")),
-                "publish": announcement_publish_date(item).isoformat()
-                if announcement_publish_date(item)
-                else "",
-                "deadline": _deadline_label(item),
-                "positions": _short(item.get("positionsText"), 80),
-                "url": _text(item.get("applyUrl")) or _text(item.get("announcementUrl")),
-            }
-            for item in scoped[: args.limit_print]
-        ]
-
     if args.json:
+        payload.pop("items", None)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
@@ -291,8 +347,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"时间窗：{window_label}")
     print(f"范围：{scope_label}（{len(groups)} 个行业组 + {len(keywords)} 个关键词）")
     print(
-        f"拉取 {len(postings)} 条 · 窗口内 {len(in_window)} 条 · "
-        f"命中 {len(scoped)} 条（行业 {reasons['group']} / 关键词扩展 {reasons['keyword']}）"
+        f"拉取 {payload['fetched']} 条 · 窗口内 {payload['in_window']} 条 · "
+        f"命中 {payload['matched']} 条（行业 {payload['matched_by']['group']} / "
+        f"关键词扩展 {payload['matched_by']['keyword']}）"
     )
     if args.dry_run:
         print("预演模式：没有写库。去掉 --dry-run 才会导入。")
