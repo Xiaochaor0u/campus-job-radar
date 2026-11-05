@@ -332,6 +332,10 @@ python scripts\collect_recent.py --days 7 --dry-run
 - 填好条件点「按条件筛选」，指标卡和下面的公司列表会一起收窄；点「清空筛选」回到全部
 - 想长期盯同一组条件：填个订阅名称 →「保存为订阅」，以后点那枚胶囊就一键套用
 
+> **公司名旁边的小标签**：`民营 / 国资 / 外资` 是企业性质，`3,105 人` 是员工规模。
+> 规模只显示**能核对到出处**的（年报、东方财富 F10 披露），鼠标悬停能看到「截至什么时候、来自哪里」；
+> 查不到就完全不显示——不会写「未知」，更不会猜一个数字。
+>
 > **每条岗位都会标出「发布 11-04 · 截止 11-30（剩 26 天）」**，三个页面口径一致：
 >
 > | 字段 | 怎么来的 | 没有的时候 |
@@ -678,7 +682,38 @@ python scripts\collect_offerbiu.py --types 实习 --max-pages 60
 python scripts\collect_offerbiu.py --types 秋招 春招 --max-pages 150
 ```
 
-### C. 更新打包的数据（分享给别人的时候）
+### C. 补公司人数规模
+
+页面上的员工数来自两份数据，按可信度排序：
+
+| 文件 | 覆盖 | 说明 |
+| --- | --- | --- |
+| `config/company_size.yaml` | 几十家（人工） | 逐条核对过年报，带出处和截止时间；**冲突时以它为准** |
+| `config/company_size_listed.json` | 约 1.3 万家（自动） | 从东方财富 F10 抓的上市公司最新披露员工数 |
+
+想手工补一家，往 `company_size.yaml` 里加：
+
+```yaml
+companies:
+  某某科技:
+    aliases: [某某]          # 可选：别名、英文名、简称
+    employees: 5200
+    as_of: "2024年末"        # 数据截止时间
+    source: "2024 年年度报告"  # 出处，必填
+```
+
+想刷新自动那一层（建议隔几个月跑一次）：
+
+```text
+python scripts\fetch_company_size.py --dry-run   # 先看覆盖率
+python scripts\fetch_company_size.py             # 写入 config/company_size_listed.json
+```
+
+> 匹配规则是**精确匹配**：会把「股份有限公司 / 有限公司」这类工商后缀剥掉，再比对公司名；
+> 但**不会**剥掉「集团 / 控股 / 股份」——「中国稀土集团」和上市公司「中国稀土」是两家主体，
+> 宁可匹配不上，也不能把集团的岗位标成子公司的人数。
+
+### D. 更新打包的数据（分享给别人的时候）
 
 ```powershell
 python scripts\export_seed.py
@@ -728,6 +763,7 @@ python scripts\export_seed.py
 | `scripts/collect_recent.py` | 只采最近 N 天 / N 小时的岗位，可按计算机类 / 材料类过滤，自动入库 |
 | `scripts/easy_collect.py` | 上面那个脚本的问答版，供「一键采集」双击入口调用（`--defaults` 可无交互跑） |
 | `scripts/backfill_application_window.py` | 给历史岗位补「截止投递时间」（老库升级后用一次） |
+| `scripts/fetch_company_size.py` | 抓上市公司员工数写入 `config/company_size_listed.json`（公司规模标签的数据源） |
 | `scripts/export_seed.py` / `import_seed.py` | 导出 / 导入岗位快照 |
 | `scripts/intelligence_digest.py` | 预览或推送日报（`--push` 真发） |
 | `scripts/run_local_task.py` | 手动触发某个定时任务 |
@@ -788,6 +824,7 @@ python -m pytest tests/test_intelligence.py tests/test_intelligence_api.py tests
 | 表格列宽 | 全部岗位改为 8 列并分配宽度，「画像」列不再被挤出可视区 |
 | 页面合并 | 「今日新发布」与「每日新增」合成一个「岗位变化」页：筛选条直接作用于变化列表，指标卡与列表同口径；订阅胶囊一键套用 |
 | 页签收敛 | 「全部岗位」「智能推荐」暂时从界面隐藏（`INTEL_ENABLED_TABS` 控制），接口与 DOM 保留，随时可恢复 |
+| 公司人数规模 | 公司名旁显示员工数（如 `3,105 人` / `96.9 万人`），悬停看出处与截止时间；人工核对的年报 + 东方财富 F10 披露两层数据，合计约 1.3 万家；查不到就不显示 |
 
 ### v0.1.2
 

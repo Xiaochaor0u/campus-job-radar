@@ -119,8 +119,35 @@ def _nature_lookup(company_ids) -> dict[str, str]:
     return resolved
 
 
-def _with_nature(payload: dict[str, Any], *, items_key: str | None, companies_key: str | None = None) -> dict[str, Any]:
-    """Attach ``company_nature`` to the payload's items (and company groups)."""
+def _size_fields(
+    size_map: dict[str, Any], company_id: Any, company_name: Any = ""
+) -> dict[str, Any]:
+    """Headcount fields for one row; all empty when no source states a number."""
+
+    from packages.intelligence.company_size import resolve_size
+
+    size = resolve_size(size_map, company_id=company_id, company_name=company_name)
+    if size is None:
+        return {"employee_scale": "", "employee_count": None, "employee_source": ""}
+    return {
+        "employee_scale": size.label,
+        "employee_count": size.employees,
+        "employee_source": size.describe(),
+    }
+
+
+def _with_company_labels(
+    payload: dict[str, Any], *, items_key: str | None, companies_key: str | None = None
+) -> dict[str, Any]:
+    """Attach ownership label and headcount to the payload's items and groups.
+
+    Both labels are display-only and both may be absent: ``company_nature`` is
+    "" when neither the announcement nor the curated file says, and the three
+    ``employee_*`` fields are empty when no source states a headcount.  The UI
+    renders nothing in that case rather than guessing.
+    """
+
+    from packages.intelligence.company_size import load_size_map, resolve_size
 
     company_ids = []
     if companies_key:
@@ -128,16 +155,24 @@ def _with_nature(payload: dict[str, Any], *, items_key: str | None, companies_ke
     if items_key:
         company_ids.extend(row.get("company_id", "") for row in payload.get(items_key) or [])
     lookup = _nature_lookup(company_ids)
-    if not lookup:
-        return payload
+    size_map = load_size_map(get_settings().company_size_config, get_settings().company_size_cache)
+
+    def decorate(row: dict[str, Any]) -> None:
+        company_id = row.get("company_id", "")
+        row["company_nature"] = lookup.get(company_id, "")
+        row.update(_size_fields(size_map, company_id, row.get("company_name", "")))
+
     if companies_key:
         for row in payload.get(companies_key) or []:
-            row["company_nature"] = lookup.get(row.get("company_id", ""), "")
+            decorate(row)
             for item in row.get("items") or []:
-                item["company_nature"] = lookup.get(item.get("company_id", ""), "")
+                item["company_nature"] = row["company_nature"]
+                item["employee_scale"] = row["employee_scale"]
+                item["employee_count"] = row["employee_count"]
+                item["employee_source"] = row["employee_source"]
     if items_key:
         for row in payload.get(items_key) or []:
-            row["company_nature"] = lookup.get(row.get("company_id", ""), "")
+            decorate(row)
     return payload
 
 
@@ -198,7 +233,7 @@ def intelligence_digest(
     payload["filters"]["directions"] = list(condition.directions)
     payload["filters"]["cities"] = list(condition.cities)
     payload["filters"]["track"] = condition.track
-    return _with_nature(payload, items_key=None, companies_key="companies")
+    return _with_company_labels(payload, items_key=None, companies_key="companies")
 
 
 @router.get("/events")
@@ -224,7 +259,7 @@ def intelligence_events(
                 continue
             items.append(item.to_dict())
     items.sort(key=lambda row: row.get("detected_at") or "", reverse=True)
-    return _with_nature(
+    return _with_company_labels(
         {
             "hours": hours,
             "company_id": company_id,
@@ -257,9 +292,11 @@ def intelligence_jobs(
     from sqlalchemy import func, or_, select
 
     from packages.intelligence.company_nature import load_nature_map, resolve_nature
+    from packages.intelligence.company_size import load_size_map, resolve_size
     from packages.storage import JobSnapshot
 
     nature_map = load_nature_map(get_settings().company_nature_config)
+    size_map = load_size_map(get_settings().company_size_config, get_settings().company_size_cache)
 
     conditions = [JobSnapshot.availability_status == "active"]
     if track:
@@ -331,6 +368,7 @@ def intelligence_jobs(
                     company_id=row.company_id,
                     raw_nature=(row.capture_evidence or {}).get("company_nature"),
                 ),
+                **_size_fields(size_map, row.company_id),
             }
             for row in rows
         ],
@@ -370,7 +408,7 @@ def intelligence_recommend(
         track=track or None,
         company_id=company_id or None,
     )
-    return _with_nature(result.to_dict(), items_key="items")
+    return _with_company_labels(result.to_dict(), items_key="items")
 
 
 @router.post("/job-insight")
@@ -608,7 +646,7 @@ def watch_run(
         rule_id=rule_id,
         rule_name=rule_name,
     )
-    return _with_nature(result.to_dict(), items_key="hits")
+    return _with_company_labels(result.to_dict(), items_key="hits")
 
 
 @router.get("/collect/status")

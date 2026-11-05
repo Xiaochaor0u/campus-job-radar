@@ -1,0 +1,89 @@
+# 公司人数规模（人工核对，仅收录有公开出处的数字）
+#
+# 这份文件回答一个问题：这家公司大概多大。它不参与评分，只在页面上显示一个
+# 小标签（鼠标悬停能看到出处和数据截止时间）。
+#
+# 收录规则——宁缺毋滥：
+#   1. 只收「员工总数」口径：不混用参保人数、劳务派遣、外包人数，这三者能差一倍。
+#   2. 必须有明确出处（年度报告 / 官网 / 权威媒体），写进 source。
+#   3. 写清数据截止时间 as_of，人数变化大的公司（比如光伏、车企）尤其重要。
+#   4. 拿不准就不写。页面没有这个标签，比标一个错数字好。
+#
+# 字段：
+#   employees  员工总数（整数，按来源原值，不四舍五入）
+#   as_of      数据截止时间，例如 "2024年末"
+#   source     出处，例如 "2024 年年度报告"
+#   aliases    别名，用于匹配（公司 id、英文名、简称都可以）
+#
+# 想补充：按同样格式加一条即可，改完刷新页面就生效，不用重启。
+companies:
+  科大讯飞:
+    aliases: [iflytek]
+    employees: 15551
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  中兴通讯:
+    aliases: [zte]
+    employees: 68375
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  海康威视:
+    aliases: [hikvision]
+    employees: 59689
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  传音控股:
+    aliases: [transsion, 传音]
+    employees: 19870
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  隆基绿能:
+    aliases: [longi]
+    employees: 37853
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  迈瑞医疗:
+    aliases: [mindray]
+    employees: 21667
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  安克创新:
+    aliases: [anker]
+    employees: 5034
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  比亚迪:
+    aliases: [byd]
+    employees: 968872
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  理想汽车:
+    aliases: [li-auto, 理想]
+    employees: 32248
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  百度:
+    aliases: [baidu]
+    employees: 35900
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  宁德时代:
+    aliases: [catl]
+    employees: 131988
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  大华股份:
+    aliases: [dahua, 浙江大华, 大华]
+    employees: 23891
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  新和成:
+    aliases: [zhejiang-nhu]
+    employees: 11369
+    as_of: "2024年末"
+    source: "2024 年年度报告"
+  紫光股份:
+    aliases: [unis]
+    employees: 17242
+    as_of: "2024年末"
+    source: "2024 年年度报告"

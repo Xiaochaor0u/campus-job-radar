@@ -276,6 +276,18 @@ class Settings(BaseSettings):
         return self.agent_root / "config" / "company_nature.yaml"
 
     @property
+    def company_size_config(self) -> Path:
+        """Hand-checked headcount; missing file just means no size badges."""
+
+        return self.agent_root / "config" / "company_size.yaml"
+
+    @property
+    def company_size_cache(self) -> Path:
+        """Listed-company headcount fetched from Eastmoney F10 (fallback layer)."""
+
+        return self.agent_root / "config" / "company_size_listed.json"
+
+    @property
     def notify_config(self) -> Path:
         """Group-bot push configuration; missing file means push disabled."""
 

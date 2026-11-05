@@ -6541,6 +6541,19 @@
     return badge;
   }
 
+  // 公司人数规模：只有能核对到出处的才显示；没有就什么也不加，
+  // 不用「未知」占位，免得看起来像"这家公司没有员工数"。
+  function intelSizeBadge(row) {
+    const label = String(row?.employee_scale || "").trim();
+    if (!label) return null;
+    const badge = document.createElement("span");
+    badge.className = "company-size";
+    badge.textContent = label;
+    const source = String(row?.employee_source || "").trim();
+    badge.title = source ? `员工总数 · ${source}` : "员工总数";
+    return badge;
+  }
+
   function intelNatureBadge(nature) {
     if (!nature) return null;
     const badge = document.createElement("span");
@@ -6663,6 +6676,8 @@
     summary.appendChild(name);
     const companyNature = intelNatureBadge(company.company_nature);
     if (companyNature) summary.appendChild(companyNature);
+    const companySize = intelSizeBadge(company);
+    if (companySize) summary.appendChild(companySize);
     const badges = document.createElement("span");
     badges.className = "intelligence-badges";
     if (company.new_count) badges.appendChild(renderIntelligenceBadge("new", company.new_count));
@@ -6908,6 +6923,8 @@
       nature.textContent = item.company_nature;
       companyCell.appendChild(nature);
     }
+    const listedSize = intelSizeBadge(item);
+    if (listedSize) companyCell.appendChild(listedSize);
     row.appendChild(companyCell);
 
     const titleCell = document.createElement("td");
