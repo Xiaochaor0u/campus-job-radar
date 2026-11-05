@@ -265,6 +265,8 @@ python scripts/quickstart.py
   - 不展开也没关系：按钮按上次保存的范围采集
   - 源站按发布时间倒序，采集翻到窗口边界就停，所以**近 7 天通常几秒到几十秒**，不再全量扫 2 万条
   - **「材料/新材料」是细筛项**：源站没有独立的材料分组，材料岗散在化工/制造/半导体/汽车四个行业里，所以勾它会先限这四个行业、再按岗位名筛出材料相关岗位（材料、高分子、电池、冶金、封装、硅片……）。它不会把四个行业的 HR、财务、销售一起收进来，也不影响你另外勾的普通行业。
+  - **工作地点**：填「郑州」就只收郑州的岗位（「郑州市」「郑州航空港区」也算），留空是全国。可以写多个城市，用顿号或逗号分隔。城市按源站公告里的工作地点匹配，一家公司列了 20 个城市时，只要其中一个是你填的城市就算命中。
+  - **届别**：选「2027 届」时，秋招/春招只收写明 2027 届的公告；**实习不受届别限制**——寒假实习、日常实习、明年春季实习经常不写届别，卡届别会把它们全删掉。
 - **双击「一键采集.bat」**：三步选择题，不用记参数（见上面的「懒人版」）
 - **命令行脚本（想放到批处理/定时任务，或用细粒度参数）**：见下面「⓪-B」
 - **自动（可选）**：跑一次 `scripts/install_windows_tasks.ps1`，之后每天定时采集，不用手动点
@@ -291,6 +293,9 @@ python scripts\collect_recent.py --preset materials --days 30
 # 只要计算机类，并额外限定关键词
 python scripts\collect_recent.py --preset cs --days 7 --keywords 算法,后端,嵌入式
 
+# 只看郑州，2027 届秋招 + 各类实习，最近 90 天
+python scripts\collect_recent.py --days 90 --groups internet-tech,materials --city 郑州 --cohort 2027
+
 # 先看会采到什么，不写库
 python scripts\collect_recent.py --days 7 --dry-run
 ```
@@ -304,7 +309,9 @@ python scripts\collect_recent.py --days 7 --dry-run
 | `--since / --until` | 指定起止日期，如 `--since 2026-10-28 --until 2026-11-04` |
 | `--preset cs / materials / both` | 领域预设：计算机类 / 材料类 / 两者（默认 both） |
 | `--keywords` | 追加关键词（逗号分隔）；给了就按关键词匹配岗位名 |
-| `--groups` | 按行业组兜底（`internet-tech`、`energy-chemical-environment`、`materials` 等），默认不用 |
+| `--groups` | 按行业组选（`internet-tech`、`materials`、`energy-chemical-environment` 等）；给了就**不再叠加**预设关键词 |
+| `--city` / `--cities` | 只看这些城市的岗位：`--city 郑州` 或 `--city 郑州,洛阳`（默认全国） |
+| `--cohort` | 只看某届校招，如 `--cohort 2027`；0＝不限。**实习不受此限**，寒假/日常/春季实习都会收 |
 | `--types` | 招聘类型：`实习` `秋招` `春招`（可多选） |
 | `--dry-run` | 只统计和预览，不写库 |
 
@@ -821,6 +828,7 @@ python -m pytest tests/test_intelligence.py tests/test_intelligence_api.py tests
 | 发布时间 / 截止投递时间 | 岗位表新增 `publish_date` / `deadline_date` / `deadline_text`；今日新发布、全部岗位、智能推荐、每日新增四处统一展示，缺失就写「未公布」，不猜日期 |
 | 按时间窗采集 | 源站按发布时间倒序，采集翻到窗口边界就停：近 7 天从原来的 3–6 分钟降到**几秒到几十秒**，按钮不再"一直转圈" |
 | 采集面板 | 新增「近 1 / 3 / 7 / 30 天」窗口选择，和行业范围一起记住 |
+| 地域与届别 | 采集面板新增「工作地点」和「届别」：填郑州就只采郑州（含郑州市/郑州航空港区，可多城市）；选 2027 届时校招只收写明 2027 届的公告，实习不受届别限制。新增 0 时会注明"范围内 N 条已在库"，避免误以为没跑 |
 | 材料类行业选项 | 行业范围新增「材料/新材料」：源站没有独立材料分组，材料岗散在化工/制造/半导体/汽车四个组里，所以先限行业再按岗位名细筛；「自动化工程师」不会被当成「化工」（子串误判已排除） |
 | 新脚本 `collect_recent.py` | 自定义时间窗（`--days` / `--hours` / `--since`）、可选计算机类 / 材料类预设、`--dry-run` 预览，采完直接入库 |
 | 历史数据回填 | `backfill_application_window.py` 从老数据里补出 22322 条截止文字、3117 个截止日期 |

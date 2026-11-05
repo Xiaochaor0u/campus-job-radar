@@ -40,6 +40,12 @@ from packages.industry_scope import (  # noqa: E402
     MATERIAL_KEYWORDS,
     matches_industry_scope,
 )
+from packages.job_filters import (  # noqa: E402
+    cohort_label,
+    matches_city,
+    matches_cohort,
+    selected_place_label,
+)
 from packages.intelligence.offerbiu_source import (  # noqa: E402
     CST,
     OfferBiuError,
@@ -182,6 +188,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--keywords", default=None, help="额外关键词，逗号分隔；给了就只保留命中的")
     parser.add_argument("--groups", default=None, help="自定义行业组 code，逗号分隔（覆盖预设）")
     parser.add_argument(
+        "--city", "--cities", dest="city", default="",
+        help="只看这些城市的岗位，如 郑州 或 郑州,洛阳（默认全国）",
+    )
+    parser.add_argument(
+        "--cohort", type=int, default=0,
+        help="只看某届校招，如 2027（0＝不限；实习不受此限，寒假/日常/春季实习都会收）",
+    )
+    parser.add_argument(
         "--types", nargs="+", default=list(DEFAULT_TYPES),
         help="招聘类型：实习 / 秋招 / 春招（可多选）",
     )
@@ -210,6 +224,8 @@ def collect_window(
     end: date,
     groups: tuple[str, ...] = (),
     keywords: tuple[str, ...] = (),
+    city: str = "",
+    cohort: int = 0,
     recruit_types: tuple[str, ...] = DEFAULT_TYPES,
     max_pages: int = 300,
     delay: float = 0.2,
@@ -240,11 +256,15 @@ def collect_window(
         if published is not None and start <= published <= end:
             in_window.append(item)
 
+    # 城市和届别比行业更"硬"，先筛掉，后面的命中数才对得上用户的选择。
+    in_place = [item for item in in_window if matches_city(item, city)]
+    in_cohort = [item for item in in_place if matches_cohort(item, cohort)]
+
     group_set = frozenset(groups)
     scoped: list[dict[str, Any]] = []
     reasons: dict[str, int] = {"group": 0, "keyword": 0}
     by_preset: dict[str, int] = {key: 0 for key in PRESETS}
-    for item in in_window:
+    for item in in_cohort:
         reason = _match_reason(item, groups=group_set, keywords=keywords)
         if not reason:
             continue
@@ -257,6 +277,10 @@ def collect_window(
         "window": {"start": start.isoformat(), "end": end.isoformat()},
         "fetched": len(postings),
         "in_window": len(in_window),
+        "in_place": len(in_place),
+        "in_cohort": len(in_cohort),
+        "city": city,
+        "cohort": cohort,
         "matched": len(scoped),
         "matched_by": reasons,
         "by_preset": by_preset,
@@ -306,7 +330,10 @@ def main(argv: list[str] | None = None) -> int:
     presets = _preset_keys(args.preset)
     groups, keywords, scope_label = _merge_scope(presets)
     if args.groups:
+        # 明确指定行业组就是"按行业选"，不再叠加预设关键词，否则 A 公司的
+        # 软件岗会绕过行业限制进来（--keywords 仍可显式追加）。
         groups = tuple(part.strip() for part in args.groups.split(",") if part.strip())
+        keywords = ()
     if args.keywords:
         keywords = tuple(part.strip() for part in args.keywords.split(",") if part.strip())
 
@@ -316,6 +343,8 @@ def main(argv: list[str] | None = None) -> int:
             end=end,
             groups=groups,
             keywords=keywords,
+            city=args.city,
+            cohort=args.cohort,
             recruit_types=tuple(args.types),
             max_pages=args.max_pages,
             delay=args.delay,
@@ -331,6 +360,8 @@ def main(argv: list[str] | None = None) -> int:
         "label": scope_label,
         "groups": list(groups),
         "keywords": list(keywords),
+        "city": args.city,
+        "cohort": args.cohort,
     }
 
     if args.json:
@@ -341,8 +372,15 @@ def main(argv: list[str] | None = None) -> int:
     print("")
     print(f"时间窗：{window_label}")
     print(f"范围：{scope_label}（{len(groups)} 个行业组 + {len(keywords)} 个关键词）")
+    if args.city:
+        print(f"城市：{selected_place_label(args.city)}")
+    if args.cohort:
+        print(f"届别：{cohort_label(args.cohort)}（实习不受届别限制）")
+    place_note = f" · 城市内 {payload['in_place']} 条" if args.city else ""
+    cohort_note = f" · 届别内 {payload['in_cohort']} 条" if args.cohort else ""
     print(
-        f"拉取 {payload['fetched']} 条 · 窗口内 {payload['in_window']} 条 · "
+        f"拉取 {payload['fetched']} 条 · 窗口内 {payload['in_window']} 条"
+        f"{place_note}{cohort_note} · "
         f"命中 {payload['matched']} 条（行业 {payload['matched_by']['group']} / "
         f"关键词扩展 {payload['matched_by']['keyword']}）"
     )

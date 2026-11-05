@@ -180,3 +180,37 @@ def test_collect_rejects_an_unknown_industry_code(client: TestClient) -> None:
     )
     assert response.status_code == 422
     assert "no-such-group" in response.json()["detail"]
+
+
+def test_collect_status_exposes_city_and_cohort_choices(client: TestClient) -> None:
+    response = client.get("/api/intelligence/collect/status")
+    assert response.status_code == 200
+    options = response.json()["options"]
+    assert "selected_city" in options
+    assert 2027 in options["cohort_options"]
+
+
+def test_collect_rejects_an_impossible_cohort(client: TestClient) -> None:
+    response = client.post(
+        "/api/intelligence/collect",
+        json={"industry_groups": ["internet-tech"], "recruit_types": ["秋招"], "cohort": 3000},
+    )
+    assert response.status_code == 422
+    assert "cohort" in response.json()["detail"]
+
+
+def test_collect_status_exposes_city_and_cohort_choices(client: TestClient) -> None:
+    response = client.get("/api/intelligence/collect/status")
+    assert response.status_code == 200
+    options = response.json()["options"]
+    assert "selected_city" in options
+    assert 2027 in options["cohort_options"]
+
+
+def test_collect_rejects_an_impossible_cohort(client: TestClient) -> None:
+    response = client.post(
+        "/api/intelligence/collect",
+        json={"industry_groups": ["internet-tech"], "recruit_types": ["秋招"], "cohort": 3000},
+    )
+    assert response.status_code == 422
+    assert "cohort" in response.json()["detail"]

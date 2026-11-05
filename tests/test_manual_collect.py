@@ -135,6 +135,67 @@ def test_materials_group_filters_on_the_position_list(monkeypatch, tmp_path):
     assert status["result"]["filtered_out"] == 3
 
 
+def _patch_scope(monkeypatch, rows):
+    captured = {}
+
+    def fake_fetch(*, recruit_types, max_pages_per_type, logger=None, **kwargs):
+        return rows
+
+    def fake_ingest(storage, postings, *, record_events=True, **kwargs):
+        captured["ingested"] = [row.get("companyName") for row in postings]
+        return SimpleNamespace(
+            to_dict=lambda: {
+                "run_id": "run-scope",
+                "companies_written": len(postings),
+                "inserted": len(postings),
+                "updated": 0,
+            }
+        )
+
+    monkeypatch.setattr(manual_collect, "fetch_offerbiu_postings", fake_fetch)
+    monkeypatch.setattr(manual_collect, "ingest_offerbiu_postings", fake_ingest)
+    return captured
+
+
+def test_city_and_cohort_narrow_the_rows(monkeypatch):
+    rows = [
+        {"companyName": "郑州互联网", "industryGroupCodes": ["internet-tech"],
+         "locations": ["郑州"], "targetYears": [2027], "recruitType": "秋招"},
+        {"companyName": "北京互联网", "industryGroupCodes": ["internet-tech"],
+         "locations": ["北京"], "targetYears": [2027], "recruitType": "秋招"},
+        {"companyName": "郑州 2026 届", "industryGroupCodes": ["internet-tech"],
+         "locations": ["郑州市"], "targetYears": [2026], "recruitType": "秋招"},
+        {"companyName": "郑州实习", "industryGroupCodes": ["internet-tech"],
+         "locations": ["郑州"], "targetYears": [2026], "recruitType": "实习"},
+    ]
+    captured = _patch_scope(monkeypatch, rows)
+
+    manual_collect.start_collection(
+        object(),
+        industry_groups=["internet-tech"],
+        recruit_types=["秋招", "实习"],
+        city="郑州",
+        cohort=2027,
+    )
+    status = _wait_for_result()
+
+    # 实习不按届别卡：郑州那条 2026 届的实习照样收。
+    assert captured["ingested"] == ["郑州互联网", "郑州实习"]
+    assert status["scope"]["city"] == "郑州"
+    assert status["scope"]["cohort"] == 2027
+    assert status["result"]["in_scope"] == 2
+
+
+def test_invalid_cohort_is_rejected():
+    with pytest.raises(ValueError, match="届别"):
+        manual_collect.start_collection(
+            object(),
+            industry_groups=["internet-tech"],
+            recruit_types=["秋招"],
+            cohort=-1,
+        )
+
+
 def test_days_flag_becomes_a_publish_cutoff(patched):
     manual_collect.start_collection(
         object(),

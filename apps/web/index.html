@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f7ff">
     <title>秋招工作台 | RecruitOps Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261105-8">
-    <script defer src="./app.js?v=intel-ui-20261105-8"></script>
-    <script defer src="./company-sources.js?v=intel-ui-20261105-8"></script>
-    <script defer src="./configuration.js?v=intel-ui-20261105-8"></script>
+    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261105-10">
+    <script defer src="./app.js?v=intel-ui-20261105-10"></script>
+    <script defer src="./company-sources.js?v=intel-ui-20261105-10"></script>
+    <script defer src="./configuration.js?v=intel-ui-20261105-10"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -294,6 +294,23 @@
                 <p class="muted-label">行业范围（决定采集哪些行业的公告）：</p>
                 <div class="intel-collect-groups" id="intel-collect-groups"></div>
                 <p class="muted-label collect-panel-note" id="intel-collect-group-hint" hidden></p>
+                <p class="muted-label">工作地点（留空＝全国，可写多个城市用顿号分隔）：</p>
+                <div class="intel-collect-place">
+                  <label class="search-field" for="intel-collect-city"><span class="sr-only">城市</span><input id="intel-collect-city" type="text" list="intel-city-options" placeholder="例如：郑州" autocomplete="off"></label>
+                  <label class="intel-collect-cohort" for="intel-collect-cohort"><span>届别</span><select id="intel-collect-cohort"></select></label>
+                </div>
+                <datalist id="intel-city-options">
+                  <option value="北京"></option><option value="上海"></option><option value="广州"></option>
+                  <option value="深圳"></option><option value="杭州"></option><option value="南京"></option>
+                  <option value="苏州"></option><option value="成都"></option><option value="武汉"></option>
+                  <option value="西安"></option><option value="郑州"></option><option value="长沙"></option>
+                  <option value="合肥"></option><option value="济南"></option><option value="青岛"></option>
+                  <option value="天津"></option><option value="重庆"></option><option value="沈阳"></option>
+                  <option value="大连"></option><option value="哈尔滨"></option><option value="福州"></option>
+                  <option value="厦门"></option><option value="南昌"></option><option value="昆明"></option>
+                  <option value="贵阳"></option><option value="南宁"></option><option value="石家庄"></option>
+                  <option value="太原"></option><option value="兰州"></option><option value="洛阳"></option>
+                </datalist>
                 <p class="muted-label">招聘类型：</p>
                 <div class="intel-collect-tracks" id="intel-collect-tracks"></div>
                 <p class="muted-label">只采集最近发布过的公告：</p>

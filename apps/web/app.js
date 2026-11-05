@@ -6325,7 +6325,15 @@
     document.querySelectorAll("#intel-collect-tracks input:checked").forEach((box) => types.push(box.value));
     const picked = document.querySelector("#intel-collect-days input:checked");
     const days = Number(picked?.value || 7);
-    return { groups, types, days: Number.isFinite(days) && days > 0 ? days : 7 };
+    const city = ($("intel-collect-city")?.value || "").trim();
+    const cohort = Number($("intel-collect-cohort")?.value || 0);
+    return {
+      groups,
+      types,
+      days: Number.isFinite(days) && days > 0 ? days : 7,
+      city,
+      cohort: Number.isFinite(cohort) && cohort > 0 ? cohort : 0,
+    };
   }
 
   function renderCollectPanel(options, selectedGroups) {
@@ -6370,6 +6378,20 @@
         label.appendChild(box);
         label.appendChild(document.createTextNode(option.label));
         dayBox.appendChild(label);
+      }
+    }
+    const cityInput = $("intel-collect-city");
+    if (cityInput && !cityInput.value) cityInput.value = options?.selected_city || "";
+    const cohortSelect = $("intel-collect-cohort");
+    if (cohortSelect) {
+      const current = Number(options?.selected_cohort || 0);
+      cohortSelect.replaceChildren();
+      for (const year of options?.cohort_options || [0, 2026, 2027, 2028]) {
+        const option = document.createElement("option");
+        option.value = String(year);
+        option.textContent = year ? `${year} 届` : "不限届别";
+        option.selected = Number(year) === current;
+        cohortSelect.appendChild(option);
       }
     }
     const trackBox = $("intel-collect-tracks");
@@ -6428,9 +6450,11 @@
   }
 
   function currentScopeLabel(status) {
-    const explicit = collectSelections().groups;
+    const { groups: explicit, city, cohort } = collectSelections();
     const codes = explicit.length ? explicit : (status?.scope?.industry_groups || []);
-    return `当前范围：${groupLabels(codes)}（展开可修改）`;
+    const place = city ? ` · ${city}` : "";
+    const year = cohort ? ` · ${cohort} 届` : "";
+    return `当前范围：${groupLabels(codes)}${place}${year}（展开可修改）`;
   }
 
   function collectFreshnessLine(status) {
@@ -6441,7 +6465,14 @@
     const result = status.result;
     const scope = groupLabels(status.scope?.industry_groups);
     const window = result.days ? ` · 近 ${result.days} 天` : "";
-    return `上次采集 ${time || "—"} · 范围 ${scope}${window} · 新增 ${result.inserted ?? 0} · 变更 ${result.updated ?? 0}`;
+    const place = status.scope?.city ? ` · 城市 ${String(status.scope.city).replace(/[、,，]/g, "、")}` : "";
+    const cohort = Number(status.scope?.cohort || 0) > 0 ? ` · ${status.scope.cohort} 届` : "";
+    // 新增 0 常常只是"范围内的公告库里都有"，把这句话说出来，省得以为没跑。
+    const kept = Number(result.in_scope ?? 0);
+    const hint = (result.inserted ?? 0) === 0 && (result.updated ?? 0) === 0 && kept > 0
+      ? `（范围内 ${kept} 条已在库）`
+      : "";
+    return `上次采集 ${time || "—"} · 范围 ${scope}${window}${place}${cohort} · 新增 ${result.inserted ?? 0}${hint} · 变更 ${result.updated ?? 0}`;
   }
 
   function applyCollectStatus(status) {
@@ -6501,7 +6532,7 @@
   }
 
   async function startManualCollection() {
-    const { groups, types, days } = collectSelections();
+    const { groups, types, days, city, cohort } = collectSelections();
     if (!groups.length) { showToast("请至少选择一个行业范围，可在「手动采集」面板里勾选", "error"); return; }
     if (!types.length) { showToast("请至少选择一种招聘类型", "error"); return; }
     const button = $("intel-collect-button");
@@ -6513,7 +6544,7 @@
       await api("/api/intelligence/collect", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ industry_groups: groups, recruit_types: types, days }),
+        body: JSON.stringify({ industry_groups: groups, recruit_types: types, days, city, cohort }),
       });
       // Remember the scope so the next visit starts from the same choices,
       // and so 采集最新岗位 keeps using it without opening the panel.
@@ -6521,7 +6552,14 @@
       api("/api/local-ui/configuration/save", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: { offerbiu_industry_groups: groups } }),
+        body: JSON.stringify({
+          settings: {
+            offerbiu_industry_groups: groups,
+            offerbiu_collect_days: days,
+            offerbiu_collect_city: city,
+            offerbiu_collect_cohort: cohort,
+          },
+        }),
       }).catch(() => {});
       showToast("采集已开始，完成后本页自动刷新");
       const panel = $("intel-collect-panel");
@@ -6540,10 +6578,13 @@
     $("intel-collect-button")?.addEventListener("click", () => void startManualCollection());
     $("intel-collect-top-button")?.addEventListener("click", () => void startManualCollection());
     // Keep "current scope" honest while the user ticks boxes in the panel.
-    $("intel-collect-groups")?.addEventListener("change", () => {
+    const refreshSummary = () => {
       const summary = $("intel-collect-summary");
       if (summary) summary.textContent = currentScopeLabel(collectionLastStatus());
-    });
+    };
+    $("intel-collect-groups")?.addEventListener("change", refreshSummary);
+    $("intel-collect-city")?.addEventListener("input", refreshSummary);
+    $("intel-collect-cohort")?.addEventListener("change", refreshSummary);
   }
 
   function renderIntelligenceBadge(type, count) {

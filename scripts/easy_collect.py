@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from packages.intelligence.offerbiu_source import CST, OfferBiuError  # noqa: E402
+from packages.job_filters import selected_place_label  # noqa: E402
 from scripts.collect_recent import (  # noqa: E402
     _merge_scope,
     collect_window,
@@ -59,6 +60,12 @@ def _ask(prompt: str, *, default: str, valid: set[str]) -> str:
         if raw in valid:
             return raw
         print(f"  只认 {' / '.join(sorted(valid))}，再试一次。", flush=True)
+
+
+def _ask_text(prompt: str, *, default: str = "") -> str:
+    """自由输入（城市名这类没法穷举），回车取默认值。"""
+
+    return input(prompt).strip() or default
 
 
 def resolve_scope(raw: str) -> tuple[str, ...]:
@@ -116,27 +123,32 @@ def _print_header() -> None:
     print(LINE)
 
 
-def _ask_questions() -> tuple[tuple[str, ...], int, bool]:
+def _ask_questions() -> tuple[tuple[str, ...], int, str, bool]:
     print("")
-    print("第 1 步／共 3 步：想看哪个方向？")
+    print("第 1 步／共 4 步：想看哪个方向？")
     print("  1) 计算机类 —— 算法、开发、测试、运维、数据…")
     print("  2) 材料类   —— 材料、化工、电池、冶金、封装…")
     print("  3) 两者都要")
     scope_raw = _ask("请输入 1 / 2 / 3（直接回车＝两者都要）：", default="3", valid={"1", "2", "3"})
 
     print("")
-    print("第 2 步／共 3 步：想看最近多久发布的？")
+    print("第 2 步／共 4 步：想看最近多久发布的？")
     print("  1) 只今天        2) 最近 3 天")
     print("  3) 最近 7 天     4) 最近 30 天")
     window_raw = _ask("请输入 1-4（直接回车＝最近 7 天）：", default="3", valid={"1", "2", "3", "4"})
 
     print("")
-    print("第 3 步／共 3 步：采到之后做什么？")
+    print("第 3 步／共 4 步：只看某个城市的岗位吗？")
+    print("  直接回车＝全国；也可以写城市名，比如 郑州、洛阳（多个用顿号分隔）")
+    city = _ask_text("请输入城市（直接回车＝全国）：")
+
+    print("")
+    print("第 4 步／共 4 步：采到之后做什么？")
     print("  1) 直接加进网站（推荐）")
     print("  2) 先看看有哪些，暂时不加")
     mode_raw = _ask("请输入 1 / 2（直接回车＝直接加进网站）：", default="1", valid={"1", "2"})
 
-    return resolve_scope(scope_raw), resolve_days(window_raw), mode_raw == "2"
+    return resolve_scope(scope_raw), resolve_days(window_raw), city, mode_raw == "2"
 
 
 def _render_result(payload: dict[str, Any], presets: tuple[str, ...]) -> None:
@@ -243,11 +255,11 @@ def main(argv: list[str] | None = None) -> int:
 
     _print_header()
     if args.defaults:
-        presets, days, dry_run = ("cs", "materials"), 7, False
+        presets, days, city, dry_run = ("cs", "materials"), 7, "", False
         print("（已按默认设置运行：计算机类 + 材料类，最近 7 天）")
     else:
         try:
-            presets, days, dry_run = _ask_questions()
+            presets, days, city, dry_run = _ask_questions()
         except (KeyboardInterrupt, EOFError):
             print("\n已取消，什么都没有改。")
             return 1
@@ -258,7 +270,8 @@ def main(argv: list[str] | None = None) -> int:
     scope_label = SCOPE_LABELS.get(presets, "计算机类 + 材料类")
 
     print("")
-    print(f"开始采集：{scope_label}，{WINDOW_LABELS.get(days, f'最近 {days} 天')}")
+    place = f"，{selected_place_label(city)}" if city else ""
+    print(f"开始采集：{scope_label}，{WINDOW_LABELS.get(days, f'最近 {days} 天')}{place}")
     print("请稍候，通常 10 秒内完成（窗口越大越久）…", flush=True)
 
     page_re = re.compile(r"\[offerbiu\]\s*(\S+)\s+page\s+(\d+)/(\d+)")
@@ -278,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
             end=end,
             groups=(),
             keywords=keywords,
+            city=city,
             dry_run=dry_run,
             progress=_show_progress
         )

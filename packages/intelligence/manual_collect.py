@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from packages.industry_scope import matches_industry_scope
+from packages.job_filters import matches_city, matches_cohort
 from packages.intelligence.offerbiu_source import (
     CST,
     fetch_offerbiu_postings,
@@ -102,6 +103,8 @@ class _Collector:
         recruit_types: tuple[str, ...] | list[str],
         max_pages_per_type: int = 300,
         days: int = 7,
+        city: str = "",
+        cohort: int = 0,
     ) -> dict[str, Any]:
         groups = tuple(dict.fromkeys(str(code) for code in industry_groups))
         types = tuple(dict.fromkeys(str(value) for value in recruit_types))
@@ -111,6 +114,13 @@ class _Collector:
             raise ValueError("招聘类型只能是：实习 / 秋招 / 春招")
         if days < 1 or days > 365:
             raise ValueError("时间窗口只能是 1~365 天")
+        city = str(city or "").strip()[:64]
+        try:
+            cohort = int(cohort or 0)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("届别需要是年份，例如 2027") from exc
+        if cohort < 0 or cohort > 2100:
+            raise ValueError("届别需要是 4 位年份")
         with self._lock:
             if self._status.get("running"):
                 raise CollectionAlreadyRunning("采集正在进行中")
@@ -125,6 +135,8 @@ class _Collector:
                     "industry_groups": list(groups),
                     "recruit_types": list(types),
                     "days": days,
+                    "city": city,
+                    "cohort": cohort,
                 },
                 "result": None,
                 "error": "",
@@ -132,7 +144,7 @@ class _Collector:
             snapshot = dict(self._status)
             self._thread = threading.Thread(
                 target=self._run,
-                args=(storage, groups, types, max_pages_per_type, days),
+                args=(storage, groups, types, max_pages_per_type, days, city, cohort),
                 name="offerbiu-manual-collect",
                 daemon=True,
             )
@@ -167,6 +179,8 @@ class _Collector:
         recruit_types: tuple[str, ...],
         max_pages_per_type: int,
         days: int,
+        city: str = "",
+        cohort: int = 0,
     ) -> None:
         try:
             # Only the window the user asked for: the feed is date-ordered, so
@@ -179,9 +193,16 @@ class _Collector:
                 logger=self._progress,
             )
             fetched = len(postings)
+            # 三层筛选，顺序按"便宜且区分度大"排：城市 → 届别 → 行业。
             # 普通分组按 industryGroupCodes 命中；「材料/新材料」是组合组，
             # 还要再看岗位名——四个相关行业里的 HR、财务不算材料岗。
-            scoped = [item for item in postings if matches_industry_scope(item, groups)]
+            scoped = [
+                item
+                for item in postings
+                if matches_city(item, city)
+                and matches_cohort(item, cohort)
+                and matches_industry_scope(item, groups)
+            ]
             self._update(
                 phase="ingesting",
                 progress={
@@ -198,6 +219,8 @@ class _Collector:
             payload["in_scope"] = len(scoped)
             payload["filtered_out"] = fetched - len(scoped)
             payload["days"] = days
+            payload["city"] = city
+            payload["cohort"] = cohort
             self._update(
                 running=False,
                 phase="done",
@@ -224,6 +247,8 @@ def start_collection(
     recruit_types: tuple[str, ...] | list[str],
     max_pages_per_type: int = 300,
     days: int = 7,
+    city: str = "",
+    cohort: int = 0,
 ) -> dict[str, Any]:
     """Start one collection run; raises if another one is still going."""
 
@@ -233,6 +258,8 @@ def start_collection(
         recruit_types=recruit_types,
         max_pages_per_type=max_pages_per_type,
         days=days,
+        city=city,
+        cohort=cohort,
     )
 
 

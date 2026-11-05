@@ -5914,3 +5914,10 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 100%;
 }
 #intel-watch-form .intel-filter-actions .search-field { flex: 0 1 240px; min-width: 160px; }
+
+/* 采集面板：城市输入 + 届别下拉。城市是自由输入（带 datalist 提示），
+   所以给它比下拉更宽的伸缩空间，窄屏时整体换行。 */
+.intel-collect-place { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.intel-collect-place .search-field { flex: 0 1 260px; min-width: 170px; }
+.intel-collect-place .intel-collect-cohort { display: inline-flex; align-items: center; gap: 6px; }
+.intel-collect-place .intel-collect-cohort select { min-width: 116px; }

@@ -192,6 +192,10 @@ class Settings(BaseSettings):
     #: 采集只看最近多少天发布的公告。源站按发布时间倒序，所以这个窗口同时
     #: 决定了要翻几页——这正是按钮从几分钟变成几十秒的原因。
     offerbiu_collect_days: int = Field(default=7, ge=1, le=365)
+    #: 只看某个城市的岗位（留空＝全国）。可以写多个，用顿号或逗号分隔。
+    offerbiu_collect_city: str = Field(default="", max_length=64)
+    #: 只看某届（0＝不限届别）。实习不受此限，见 packages/job_filters.py。
+    offerbiu_collect_cohort: int = Field(default=0, ge=0, le=2100)
     offline_reconciliation_enabled: bool = True
     offline_grace_runs: int = 2
     offline_grace_days: float = 3.0

@@ -659,6 +659,9 @@ def intelligence_collect_status() -> dict[str, Any]:
     payload = collection_status()
     payload["options"] = {
         "selected_days": get_settings().offerbiu_collect_days,
+        "selected_city": get_settings().offerbiu_collect_city,
+        "selected_cohort": get_settings().offerbiu_collect_cohort,
+        "cohort_options": [0, 2026, 2027, 2028],
         "industry_groups": [
             {
                 "code": code,
@@ -723,12 +726,26 @@ def intelligence_collect(payload: dict[str, Any]) -> dict[str, Any]:
     if days < 1 or days > 365:
         raise HTTPException(status_code=422, detail="days 只能是 1~365")
 
+    raw_city = body.get("city")
+    city = "" if raw_city is None else str(raw_city).strip()
+    if len(city) > 64:
+        raise HTTPException(status_code=422, detail="城市名称太长")
+    raw_cohort = body.get("cohort", 0)
+    try:
+        cohort = int(raw_cohort or 0)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="cohort 需要是年份，例如 2027") from exc
+    if cohort < 0 or cohort > 2100:
+        raise HTTPException(status_code=422, detail="cohort 需要是 4 位年份")
+
     try:
         return start_collection(
             _storage(),
             industry_groups=groups,
             recruit_types=recruit_types,
             days=days,
+            city=city,
+            cohort=cohort,
         )
     except CollectionAlreadyRunning as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
