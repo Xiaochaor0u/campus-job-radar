@@ -5895,3 +5895,17 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
 .intel-check input { accent-color: var(--accent, #2f6fed); }
 .intel-collect-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .collect-freshness { font-size: 12px; color: var(--muted); text-align: right; max-width: 320px; line-height: 1.4; }
+
+/* --- 岗位变化：合并后的筛选条 --------------------------------------------
+   原来是固定八列的 grid，塞进 9 个控件后按钮被挤成竖排文字。
+   这里改成可换行的 flex：输入框按 170px 起伸缩，按钮整体不换行。 */
+#intel-watch-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#intel-watch-form .search-field { flex: 1 1 170px; min-width: 150px; }
+#intel-watch-form label { flex: 0 0 auto; }
+#intel-watch-form .button { flex: 0 0 auto; white-space: nowrap; }
+.intel-filter-caption { margin: 18px 0 8px; }
+/* 名称 + 三个按钮单独占一行：不依赖容器宽度，窄屏也不会散架 */
+#intel-watch-form .intel-filter-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 100%;
+}
+#intel-watch-form .intel-filter-actions .search-field { flex: 0 1 240px; min-width: 160px; }

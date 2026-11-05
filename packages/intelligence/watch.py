@@ -196,7 +196,7 @@ class WatchResult:
         }
 
 
-def _matches(
+def matches_event(
     event: JobEvent, condition: WatchCondition
 ) -> tuple[bool, tuple[str, ...]]:
     """Decide whether one event passes the condition, with the reasons."""
@@ -339,7 +339,7 @@ def run_watch(
     hits: list[WatchHit] = []
     company_counts: dict[str, int] = {}
     for event in events:
-        ok, reasons = _matches(event, condition)
+        ok, reasons = matches_event(event, condition)
         if not ok:
             continue
         company_name = event.company_name or str(event.company_id or "").replace("offerbiu:", "")
@@ -441,5 +441,6 @@ __all__ = [
     "list_rules",
     "run_watch",
     "save_rule",
+    "matches_event",
     "window_start",
 ]

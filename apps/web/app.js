@@ -6462,9 +6462,6 @@
       void loadIntelligence({ silent: true });
       intelJobsLoaded = false;
       intelRecLoaded = false;
-      if (intelActiveTab === "watch" && $("intel-watch-list")) {
-        void runWatch({ ruleId: intelWatchActiveRule });
-      }
     }
   }
 
@@ -6681,15 +6678,44 @@
     return group;
   }
 
+  // 「全部岗位」「智能推荐」暂时下线：DOM 与接口都保留，恢复时把 key 加回来即可。
+  const INTEL_ENABLED_TABS = new Set(["changes"]);
+
+  const WATCH_WINDOW_HOURS = { "3d": 72, "7d": 168, "30d": 720 };
+  const WATCH_WINDOW_LABELS = { today: "今天", "3d": "最近 3 天", "7d": "最近 7 天", "30d": "最近 30 天" };
+
+  function intelWindowHours() {
+    const key = $("intel-watch-window")?.value || "today";
+    if (key === "today") {
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return Math.max(0.5, (now.getTime() - midnight.getTime()) / 3600000);
+    }
+    return WATCH_WINDOW_HOURS[key] || 24;
+  }
+
+  function intelFilterLabel(values) {
+    const parts = [];
+    if (values.keywords) parts.push(`关键词「${values.keywords}」`);
+    if (values.directions) parts.push(`方向「${values.directions}」`);
+    if (values.cities) parts.push(`城市「${values.cities}」`);
+    if (values.track) parts.push(values.track === "internship" ? "只看实习" : "只看校招");
+    return parts.length ? `当前筛选：${parts.join(" · ")}` : "当前显示：全部变化";
+  }
+
   async function loadIntelligence({ silent = false } = {}) {
     const list = $("intelligence-companies");
     if (!list) return;
-    const hours = Number($("intelligence-window")?.value || 24);
-    const track = $("intelligence-track")?.value || "";
+    const values = watchFormValues();
+    const hours = intelWindowHours();
+    const filtered = Boolean(values.keywords || values.directions || values.cities);
     if (!silent) list.dataset.state = "loading";
     try {
-      const params = new URLSearchParams({ hours: String(hours) });
-      if (track) params.set("track", track);
+      const params = new URLSearchParams({ hours: String(Number(hours.toFixed(2))) });
+      if (values.track) params.set("track", values.track);
+      for (const key of ["keywords", "directions", "cities"]) {
+        if (values[key]) params.set(key, values[key]);
+      }
       const [digest, coverage] = await Promise.all([
         api(`/api/intelligence/digest?${params.toString()}`),
         api("/api/intelligence/coverage").catch(() => null),
@@ -6707,11 +6733,22 @@
       setText("intelligence-company-count", text((digest?.companies || []).length, "0"));
       setText(
         "intelligence-since-detail",
-        hours === 24 ? "最近 24 小时" : `最近 ${Number(digest?.hours || hours).toLocaleString("zh-CN")} 小时`,
+        WATCH_WINDOW_LABELS[$("intel-watch-window")?.value || "today"] || "今天",
       );
+      const changed = Number(digest?.total_new || 0) + Number(digest?.total_updated || 0) + Number(digest?.total_removed || 0);
+      const summary = $("intel-watch-summary");
+      if (summary) summary.hidden = false;
+      setText("watch-hit-count", changed.toLocaleString("zh-CN"));
+      setText("watch-filter-label", intelFilterLabel(values));
       const emptyNode = $("intelligence-empty");
       if (emptyNode) emptyNode.hidden = !digest?.empty;
       if (digest?.empty) {
+        setText(
+          "intelligence-empty-detail",
+          filtered
+            ? "当前筛选条件下没有匹配的变化。换个关键词，或把时间窗口放宽到最近 7 天 / 30 天。"
+            : "首次运行采集时会建立基线快照，此时不会产生「新发布」事件。等下一次定时采集完成后，这里会列出真正新增的岗位。",
+        );
         // First crawl only builds a baseline; point the user at what did land.
         const total = Number(coverage?.total_jobs || 0);
         const covered = $("intelligence-empty-covered");
@@ -7240,85 +7277,11 @@
     }
   }
 
-  function renderWatchHit(hit) {
-    const row = document.createElement("li");
-    row.className = "intelligence-item";
-    if (hit.track === "internship") row.classList.add("intelligence-item--new");
-
-    const kind = document.createElement("span");
-    kind.className = "intelligence-kind intelligence-kind--new";
-    kind.textContent = "新增";
-    row.appendChild(kind);
-
-    const main = document.createElement("div");
-    main.className = "intelligence-item-main";
-    const title = hit.detail_url ? document.createElement("a") : document.createElement("span");
-    title.className = "intelligence-title intel-recommend-title";
-    title.textContent = `${text(hit.company_name)} · ${text(hit.title)}`;
-    if (hit.detail_url) {
-      title.href = hit.detail_url;
-      title.target = "_blank";
-      title.rel = "noopener noreferrer";
-    }
-    main.appendChild(title);
-
-    const meta = document.createElement("p");
-    meta.className = "intelligence-meta";
-    const when = intelligenceTimeLabel(hit.detected_at);
-    const bits = [hit.city, INTEL_JOB_TRACK_LABELS[hit.track], when].filter(Boolean);
-    meta.textContent = bits.join(" · ");
-    meta.appendChild(intelWindowNode(hit));
-    const hitNature = intelNatureBadge(hit.company_nature);
-    if (hitNature) meta.prepend(hitNature);
-    main.appendChild(meta);
-    row.appendChild(main);
-    return row;
-  }
-
   async function runWatch({ ruleId = "" } = {}) {
-    const list = $("intel-watch-list");
-    if (!list) return;
-    const values = watchFormValues();
-    const params = new URLSearchParams({ window: values.window, limit: "150" });
-    if (ruleId) {
-      params.set("rule_id", ruleId);
-    } else {
-      for (const key of ["keywords", "directions", "cities", "track"]) {
-        if (values[key]) params.set(key, values[key]);
-      }
-    }
-    list.replaceChildren();
-    const loading = document.createElement("div");
-    loading.className = "loading-rows";
-    for (let index = 0; index < 2; index += 1) loading.appendChild(document.createElement("span"));
-    list.appendChild(loading);
-    try {
-      const payload = await api(`/api/intelligence/watch/run?${params.toString()}`);
-      const summary = $("intel-watch-summary");
-      if (summary) summary.hidden = false;
-      setText("watch-hit-count", Number(payload?.total_hits || 0).toLocaleString("zh-CN"));
-      setText("watch-scanned", Number(payload?.scanned_events || 0).toLocaleString("zh-CN"));
-      const empty = $("intel-watch-empty");
-      const hits = payload?.hits || [];
-      if (empty) empty.hidden = hits.length > 0;
-      if (!hits.length) {
-        setText(
-          "intel-watch-empty-detail",
-          payload?.scanned_events
-            ? `窗口内有 ${payload.scanned_events} 条新增记录，但没有符合当前条件的。可以放宽城市或换个关键词。`
-            : "这个窗口内还没有新增记录。等下一次定时采集跑完再来看，或者先把时间窗口切到「最近 7 天」。",
-        );
-      }
-      list.replaceChildren();
-      for (const hit of hits) list.appendChild(renderWatchHit(hit));
-      list.dataset.state = hits.length ? "ready" : "empty";
-    } catch (error) {
-      list.replaceChildren();
-      const note = document.createElement("p");
-      note.className = "muted-label";
-      note.textContent = `筛选失败：${error.message}`;
-      list.appendChild(note);
-    }
+    // 合并后不再单独请求 /watch/run：筛选条件直接作用于「岗位变化」列表，
+    // 指标卡和列表因此永远是同一批事件。
+    if (ruleId) intelWatchActiveRule = ruleId;
+    await loadIntelligence();
   }
 
   async function saveWatchRule() {
@@ -7366,14 +7329,13 @@
 
   let intelActiveTab = "changes";
 
-  // Per-tab page furniture: the view is shared by four quite different tabs,
-  // so the heading / description / filter bar follow the active tab instead
-  // of always claiming to be 今日新发布.
+  // 合并后只剩「岗位变化」：原来的「每日新增」筛选已经并进这一页，
+  // 其余页签先隐藏，DOM 与接口保持原样，方便以后重新打开。
   const INTEL_TAB_META = {
     changes: {
-      eyebrow: "岗位情报站 / 定时采集",
-      title: "今日新发布",
-      description: "定时采集各企业官网后，按「新增 / 变更 / 下架」列出岗位变化。首次采集只建立基线，从第二天起看到的都是真实的新发布。",
+      eyebrow: "岗位情报站 / 岗位变化",
+      title: "岗位变化",
+      description: "按「新增 / 变更 / 下架」列出岗位变化，下面的筛选条可以只看你要的方向、城市和类型。首次采集只建立基线，从第二天起看到的都是真实的新发布。",
       filters: true,
       usage: true,
     },
@@ -7401,6 +7363,7 @@
   };
 
   function switchIntelTab(tab) {
+    if (!INTEL_ENABLED_TABS.has(tab)) tab = "changes";
     intelActiveTab = tab;
     const changes = $("intel-changes-view");
     const all = $("intel-all-view");
@@ -7426,7 +7389,7 @@
       item.classList.toggle("is-active", activeView === "intelligence" && item.dataset.intelNavTab === tab);
     });
     if (activeView === "intelligence") {
-      const tabTitles = { all: "全部岗位", recommend: "智能推荐", watch: "每日新增", changes: "今日新发布" };
+      const tabTitles = { all: "全部岗位", recommend: "智能推荐", watch: "每日新增", changes: "岗位变化" };
       const tabEyebrows = {
         changes: "岗位情报站 / 定时采集",
         all: "岗位情报站 / 岗位库",
@@ -7434,20 +7397,22 @@
         watch: "岗位情报站 / 订阅",
       };
       setText("page-eyebrow", tabEyebrows[tab] || "岗位情报站 / 定时采集");
-      setText("page-title", tabTitles[tab] || "今日新发布");
+      setText("page-title", tabTitles[tab] || "岗位变化");
     }
-    if (tab === "all" && !intelJobsLoaded) void loadIntelligenceJobs(1);
-    if (tab === "recommend" && !intelRecLoaded) void loadRecommendations();
-    if (tab === "watch") {
-      if (!intelWatchLoaded) void loadWatchMeta().then((payload) => {
-        const first = payload?.rules?.[0];
-        if (first) {
-          intelWatchActiveRule = first.id;
-          fillWatchForm(first);
-          void runWatch({ ruleId: first.id });
-        }
-      });
-    }
+  }
+
+  function applyIntelTabVisibility() {
+    let visibleTabs = 0;
+    document.querySelectorAll("[data-intel-tab]").forEach((button) => {
+      button.hidden = !INTEL_ENABLED_TABS.has(button.dataset.intelTab);
+      if (!button.hidden) visibleTabs += 1;
+    });
+    // 只剩一个页签时，那行标签本身就是一条多余的分隔线。
+    const tabBar = document.querySelector(".intel-tabs");
+    if (tabBar) tabBar.hidden = visibleTabs <= 1;
+    document.querySelectorAll("[data-intel-nav-tab]").forEach((item) => {
+      item.hidden = !INTEL_ENABLED_TABS.has(item.dataset.intelNavTab);
+    });
   }
 
   async function primeNavCounts() {
@@ -7474,8 +7439,6 @@
   function bindIntelligenceControls() {
     bindIntelTabControls();
     $("intelligence-refresh-button")?.addEventListener("click", () => void loadIntelligence());
-    $("intelligence-window")?.addEventListener("change", () => void loadIntelligence());
-    $("intelligence-track")?.addEventListener("change", () => void loadIntelligence());
     $("intelligence-goto-jobs")?.addEventListener("click", () => {
       const navButton = document.querySelector('[data-view="jobs"][data-job-nav-mode="all"]');
       if (navButton) navButton.click(); else switchView("jobs");
@@ -7508,6 +7471,16 @@
       intelWatchActiveRule = "";
       void runWatch();
     });
+    $("intel-watch-clear")?.addEventListener("click", () => {
+      for (const id of ["intel-watch-keywords", "intel-watch-directions", "intel-watch-cities", "intel-watch-name"]) {
+        const field = $(id);
+        if (field) field.value = "";
+      }
+      const track = $("intel-watch-track");
+      if (track) track.value = "";
+      intelWatchActiveRule = "";
+      void loadIntelligence();
+    });
     $("intel-watch-save")?.addEventListener("click", () => void saveWatchRule());
     $("intel-watch-window")?.addEventListener("change", () => {
       void runWatch({ ruleId: intelWatchActiveRule });
@@ -7537,7 +7510,7 @@
     });
     const titles = {
       dashboard: ["工作台 / 今日", "今日工作台"],
-      intelligence: ["岗位情报站 / 定时采集", "今日新发布"],
+      intelligence: ["岗位情报站 / 岗位变化", "岗位变化"],
       assistant: ["任务入口", "求职助理"],
       jobs: ["岗位 / 2027 届", state.jobBrowse.mode === "today" ? "今日新增" : "27届校招"],
       companies: ["来源与岗位覆盖", "公司"],
@@ -8015,7 +7988,9 @@
     const requestedView = new URLSearchParams(window.location.search).get("view");
     if (requestedView && [...document.querySelectorAll("[data-view-panel]")].some(panel => panel.dataset.viewPanel === requestedView)) initialView = requestedView;
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    bind(); bindIntelligenceControls(); switchView(initialView); updateIntentHint(); renderConversation(); renderTaskHistory(); renderDashboardTodos(); loadCore();
+    applyIntelTabVisibility();
+    bind(); bindIntelligenceControls(); switchView(initialView);
+    void loadWatchMeta(); updateIntentHint(); renderConversation(); renderTaskHistory(); renderDashboardTodos(); loadCore();
     void primeNavCounts();
     void pollCollectStatus({ render: true });
     if (initialView === "intelligence" && requestedTab) switchIntelTab(requestedTab);

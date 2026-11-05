@@ -327,6 +327,42 @@ def test_digest_groups_by_company_and_excludes_baseline() -> None:
     assert internship.empty is True
 
 
+def test_digest_can_be_filtered_with_a_watch_condition() -> None:
+    """岗位变化 页把筛选条件前置到聚合之前：指标卡和列表必须同一口径。"""
+
+    from packages.intelligence.watch import WatchCondition
+
+    storage = _storage()
+    # 第一轮只建基线，否则下面的「新增」会被 baseline 吃掉。
+    _save(storage, _job("job-0", "acme", title="行政助理"))
+    record_pipeline_events(
+        storage, _payload(new=("job-0",), companies={"acme": "Acme"}),
+        run_id="run-1", run_started_at=NOW, clock=NOW,
+    )
+    _save(storage, _job("job-1", "acme", title="算法工程师"))
+    record_pipeline_events(
+        storage, _payload(new=("job-1",), companies={"acme": "Acme"}),
+        run_id="run-2", run_started_at=NOW, clock=NOW + timedelta(minutes=1),
+    )
+    _save(storage, _job("job-2", "acme", title="行政专员"))
+    record_pipeline_events(
+        storage, _payload(new=("job-2",), companies={"acme": "Acme"}),
+        run_id="run-3", run_started_at=NOW, clock=NOW + timedelta(minutes=2),
+    )
+
+    everything = build_daily_digest(storage, hours=24, now=NOW + timedelta(minutes=10))
+    assert everything.total_new == 2
+
+    only_algo = build_daily_digest(
+        storage,
+        hours=24,
+        now=NOW + timedelta(minutes=10),
+        condition=WatchCondition(keywords=("算法",)),
+    )
+    assert only_algo.total_new == 1
+    assert only_algo.companies[0].items[0].title == "算法工程师"
+
+
 def test_digest_window_excludes_old_events() -> None:
     storage = _storage()
     _save(storage, _job("job-1", "acme"))

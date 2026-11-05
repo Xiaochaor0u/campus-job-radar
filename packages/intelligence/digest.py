@@ -15,6 +15,8 @@ from sqlalchemy import select
 
 from packages.storage import JobEvent, JobSnapshot, Storage
 
+from .watch import WatchCondition, matches_event
+
 DIGEST_EVENT_TYPES = ("new", "updated", "removed")
 DEFAULT_DIGEST_HOURS = 24.0
 DEFAULT_MAX_ITEMS_PER_TYPE = 20
@@ -136,8 +138,14 @@ def build_daily_digest(
     event_types: tuple[str, ...] = DIGEST_EVENT_TYPES,
     max_items_per_type: int = DEFAULT_MAX_ITEMS_PER_TYPE,
     now: datetime | None = None,
+    condition: WatchCondition | None = None,
 ) -> DigestResult:
-    """Collect user-visible events detected within the last ``hours``."""
+    """Collect user-visible events detected within the last ``hours``.
+
+    ``condition`` reuses the subscription matcher, so the change list on the
+    「岗位变化」page can be narrowed by the same keyword/city/track rules that
+    the daily-new filter uses — one definition of "matches", not two.
+    """
 
     if not isinstance(storage, Storage):
         raise TypeError("storage must be a Storage instance")
@@ -197,6 +205,10 @@ def build_daily_digest(
     for row in rows:
         if track and str(row.track or "unknown") != str(track).strip():
             continue
+        if condition is not None:
+            passed, _reasons = matches_event(row, condition)
+            if not passed:
+                continue
         published, closes, wording = windows.get(row.job_id, ("", "", ""))
         items.append(
             DigestItem(

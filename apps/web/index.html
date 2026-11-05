@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f7ff">
     <title>秋招工作台 | RecruitOps Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261104-1">
-    <script defer src="./app.js?v=intel-ui-20261104-1"></script>
-    <script defer src="./company-sources.js?v=intel-ui-20261104-1"></script>
-    <script defer src="./configuration.js?v=intel-ui-20261104-1"></script>
+    <link rel="stylesheet" href="./styles.css?v=intel-ui-20261105-4">
+    <script defer src="./app.js?v=intel-ui-20261105-4"></script>
+    <script defer src="./company-sources.js?v=intel-ui-20261105-4"></script>
+    <script defer src="./configuration.js?v=intel-ui-20261105-4"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -24,14 +24,14 @@
         <nav class="primary-nav" aria-label="工作台导航">
           <button class="nav-item" type="button" data-view="configuration"><span class="nav-symbol" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 7h16M4 17h16"></path><circle cx="8" cy="7" r="3" fill="white"></circle><circle cx="16" cy="17" r="3" fill="white"></circle></svg></span><span>配置</span></button>
           <p class="nav-group-label">发现</p>
-          <button class="nav-item" type="button" data-view="intelligence" data-intel-nav-tab="all">
+          <button class="nav-item" type="button" data-view="intelligence" data-intel-nav-tab="all" hidden>
             <span class="nav-symbol" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></span>
             <span>全部岗位</span>
             <span class="nav-count" id="nav-all-jobs-count">—</span>
           </button>
           <button class="nav-item" type="button" data-view="intelligence" data-intel-nav-tab="changes">
             <span class="nav-symbol" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6 7.7 7.7M16.3 16.3l2.1 2.1M18.4 5.6 16.3 7.7M7.7 16.3 5.6 18.4"></path><circle cx="12" cy="12" r="3.5"></circle></svg></span>
-            <span>今日新发布</span>
+            <span>岗位变化</span>
             <span class="nav-count" id="nav-intelligence-count">—</span>
           </button>
           <button class="nav-item is-active" type="button" data-view="jobs" data-job-nav-mode="all">
@@ -261,22 +261,11 @@
           <section class="view-panel" id="intelligence-view" data-view-panel="intelligence" aria-labelledby="intelligence-heading" hidden>
             <div class="section-heading">
               <div>
-                <p class="eyebrow" id="intelligence-eyebrow">岗位情报站 / 定时采集</p>
-                <h2 id="intelligence-heading">今日新发布</h2>
-                <p class="section-description" id="intelligence-description">定时采集各企业官网后，按「新增 / 变更 / 下架」列出岗位变化。首次采集只建立基线，从第二天起看到的都是真实的新发布。</p>
+                <p class="eyebrow" id="intelligence-eyebrow">岗位情报站 / 岗位变化</p>
+                <h2 id="intelligence-heading">岗位变化</h2>
+                <p class="section-description" id="intelligence-description">按「新增 / 变更 / 下架」列出岗位变化，下面的筛选条可以只看你要的方向、城市和类型。首次采集只建立基线，从第二天起看到的都是真实的新发布。</p>
               </div>
               <div class="section-actions" id="intelligence-filters">
-                <label><span class="sr-only">统计窗口</span><select id="intelligence-window">
-                  <option value="24">最近 24 小时</option>
-                  <option value="72">最近 3 天</option>
-                  <option value="168">最近 7 天</option>
-                  <option value="720">最近 30 天</option>
-                </select></label>
-                <label><span class="sr-only">招聘类型</span><select id="intelligence-track">
-                  <option value="">全部类型</option>
-                  <option value="campus">校招</option>
-                  <option value="internship">实习</option>
-                </select></label>
                 <button class="icon-button" id="intelligence-refresh-button" type="button" aria-label="刷新岗位情报" title="刷新岗位情报"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.7-3.9L4 9M4 5v4h4M4 13a8 8 0 0 0 14.7 3.9L20 15M20 19v-4h-4"></path></svg></button>
                 <span class="collect-freshness" id="intel-collect-freshness" hidden></span>
                 <button class="button button--primary" id="intel-collect-top-button" type="button">采集最新岗位</button>
@@ -290,9 +279,9 @@
 
             <div class="intel-tabs" role="tablist" aria-label="岗位情报视图">
               <button class="intel-tab is-active" type="button" role="tab" data-intel-tab="changes" aria-selected="true">岗位变化</button>
-              <button class="intel-tab" type="button" role="tab" data-intel-tab="all" aria-selected="false">全部岗位 <span class="intel-tab-count" id="intel-all-count">—</span></button>
-              <button class="intel-tab" type="button" role="tab" data-intel-tab="recommend" aria-selected="false">智能推荐</button>
-              <button class="intel-tab" type="button" role="tab" data-intel-tab="watch" aria-selected="false">每日新增</button>
+              <button class="intel-tab" type="button" role="tab" data-intel-tab="all" aria-selected="false" hidden>全部岗位 <span class="intel-tab-count" id="intel-all-count">—</span></button>
+              <button class="intel-tab" type="button" role="tab" data-intel-tab="recommend" aria-selected="false" hidden>智能推荐</button>
+              <button class="intel-tab" type="button" role="tab" data-intel-tab="watch" aria-selected="false" hidden>每日新增</button>
             </div>
 
             <div id="intel-changes-view">
@@ -312,15 +301,46 @@
                   <button class="button" type="button" id="intel-collect-button">开始采集</button>
                   <span class="muted-label" id="intel-collect-status"></span>
                 </div>
-                <p class="muted-label collect-panel-note">采集会把新公告记入「今日新发布」；范围之外的行业不会采集，也不会影响已经入库的岗位。按时间窗采集只需几十秒（源站按发布时间倒序，翻到窗口边界就停）。</p>
+                <p class="muted-label collect-panel-note">采集会把新公告记入「岗位变化」；范围之外的行业不会采集，也不会影响已经入库的岗位。按时间窗采集只需几十秒（源站按发布时间倒序，翻到窗口边界就停）。</p>
               </div>
             </details>
+
+              <p class="muted-label intel-filter-caption">筛选岗位变化（留空＝看全部；条件可以存成订阅，下次一键套用）：</p>
+              <div class="intel-watch-rules" id="intel-watch-rules"></div>
+
+              <form class="job-filter-bar" id="intel-watch-form">
+                <label class="search-field" for="intel-watch-keywords"><span class="sr-only">关键词</span><input id="intel-watch-keywords" type="search" placeholder="关键词：算法, 大模型" autocomplete="off"></label>
+                <label class="search-field" for="intel-watch-directions"><span class="sr-only">岗位方向</span><input id="intel-watch-directions" type="search" placeholder="方向：算法工程师, 后端" autocomplete="off"></label>
+                <label class="search-field" for="intel-watch-cities"><span class="sr-only">城市</span><input id="intel-watch-cities" type="search" placeholder="城市：北京, 上海" autocomplete="off"></label>
+                <label><span class="sr-only">招聘类型</span><select id="intel-watch-track">
+                  <option value="">校招 + 实习</option>
+                  <option value="campus">只看校招</option>
+                  <option value="internship">只看实习</option>
+                </select></label>
+                <label><span class="sr-only">时间窗口</span><select id="intel-watch-window">
+                  <option value="today">今天新增</option>
+                  <option value="3d">最近 3 天</option>
+                  <option value="7d">最近 7 天</option>
+                  <option value="30d">最近 30 天</option>
+                </select></label>
+                <div class="intel-filter-actions">
+                  <label class="search-field" for="intel-watch-name"><span class="sr-only">订阅名称</span><input id="intel-watch-name" type="text" placeholder="订阅名称（可选，填了就保存）" autocomplete="off"></label>
+                  <button class="button button--primary" id="intel-watch-run" type="button">按条件筛选</button>
+                  <button class="button button--ghost" id="intel-watch-clear" type="button">清空筛选</button>
+                  <button class="button button--ghost" id="intel-watch-save" type="button">保存为订阅</button>
+                </div>
+              </form>
+
+            <div class="coverage-strip" id="intel-watch-summary" hidden>
+                <span><strong id="watch-hit-count">—</strong> 条变化</span>
+                <span class="coverage-hint" id="watch-filter-label">当前显示：全部变化</span>
+                <span class="coverage-hint" id="watch-freshness">—</span>
+              </div>
 
             <div class="coverage-strip" id="intelligence-coverage" hidden>
               <span><strong id="coverage-total">—</strong> 个岗位已入库</span>
               <span><strong id="coverage-active">—</strong> 个在招</span>
               <span><strong id="coverage-campus">—</strong> 个可进 27 届校招视图</span>
-              <span class="coverage-hint">其余岗位标题未写明届别，点左侧「全部岗位」可查看全量</span>
             </div>
 
             <div class="metric-grid jobs-metric-grid" aria-label="岗位变化摘要">
@@ -410,42 +430,6 @@
               </div>
             </div>
 
-            <div id="intel-watch-view" hidden>
-              <div class="intel-watch-rules" id="intel-watch-rules"></div>
-
-              <form class="job-filter-bar" id="intel-watch-form">
-                <label class="search-field" for="intel-watch-keywords"><span class="sr-only">关键词</span><input id="intel-watch-keywords" type="search" placeholder="关键词：算法, 大模型" autocomplete="off"></label>
-                <label class="search-field" for="intel-watch-directions"><span class="sr-only">岗位方向</span><input id="intel-watch-directions" type="search" placeholder="方向：算法工程师, 后端" autocomplete="off"></label>
-                <label class="search-field" for="intel-watch-cities"><span class="sr-only">城市</span><input id="intel-watch-cities" type="search" placeholder="城市：北京, 上海" autocomplete="off"></label>
-                <label><span class="sr-only">招聘类型</span><select id="intel-watch-track">
-                  <option value="">校招 + 实习</option>
-                  <option value="campus">只看校招</option>
-                  <option value="internship">只看实习</option>
-                </select></label>
-                <label><span class="sr-only">时间窗口</span><select id="intel-watch-window">
-                  <option value="today">今天新增</option>
-                  <option value="3d">最近 3 天</option>
-                  <option value="7d">最近 7 天</option>
-                  <option value="30d">最近 30 天</option>
-                </select></label>
-                <label class="search-field" for="intel-watch-name"><span class="sr-only">订阅名称</span><input id="intel-watch-name" type="text" placeholder="订阅名称（可选，填了就保存）" autocomplete="off"></label>
-                <button class="button button--primary" id="intel-watch-run" type="button">筛选新增岗位</button>
-                <button class="button button--ghost" id="intel-watch-save" type="button">保存为订阅</button>
-              </form>
-
-              <div class="coverage-strip" id="intel-watch-summary" hidden>
-                <span><strong id="watch-hit-count">—</strong> 个命中</span>
-                <span>共扫描 <strong id="watch-scanned">—</strong> 条新增记录</span>
-                <span class="coverage-hint" id="watch-freshness">—</span>
-              </div>
-
-              <div class="empty-state" id="intel-watch-empty" hidden>
-                <h3>还没有命中</h3>
-                <p id="intel-watch-empty-detail">填一个关键词或方向再点「筛选新增岗位」。订阅只在本地保存，不会上传。</p>
-              </div>
-
-              <div id="intel-watch-list" class="intelligence-company-list"></div>
-            </div>
           </section>
 
           <section class="view-panel is-visible" id="jobs-view" data-view-panel="jobs" aria-labelledby="jobs-heading">

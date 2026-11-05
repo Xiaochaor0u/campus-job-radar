@@ -147,8 +147,18 @@ def intelligence_digest(
     company_id: str | None = Query(default=None, max_length=255),
     track: str | None = Query(default=None, max_length=32),
     max_items: int | None = Query(default=None, ge=1, le=100),
+    keywords: str | None = Query(default=None, max_length=200),
+    directions: str | None = Query(default=None, max_length=200),
+    cities: str | None = Query(default=None, max_length=200),
 ) -> dict[str, Any]:
-    """Aggregate new/updated/removed events for the recent window."""
+    """Aggregate new/updated/removed events for the recent window.
+
+    The 岗位变化 page merges what used to be two tabs: the change feed and the
+    daily-new filter.  The filter is applied here, before grouping, so the
+    metric cards and the list always describe the same set of events.
+    """
+
+    from packages.intelligence.watch import WatchCondition
 
     try:
         notify = load_notify_config()
@@ -158,6 +168,20 @@ def intelligence_digest(
         notify.digest_hours if notify else 24.0,
         hours,
     )
+
+    def _terms(value: str | None) -> tuple[str, ...]:
+        return tuple(
+            part.strip()
+            for part in (value or "").replace("，", ",").split(",")
+            if part.strip()
+        )
+
+    condition = WatchCondition(
+        keywords=_terms(keywords),
+        directions=_terms(directions),
+        cities=_terms(cities),
+        track=(track or "").strip().casefold(),
+    )
     try:
         digest = build_daily_digest(
             _storage(),
@@ -165,10 +189,16 @@ def intelligence_digest(
             company_id=company_id or None,
             track=track or None,
             max_items_per_type=max_items or 20,
+            condition=None if condition.empty else condition,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _with_nature(digest.to_dict(), items_key=None, companies_key="companies")
+    payload = digest.to_dict()
+    payload["filters"]["keywords"] = list(condition.keywords)
+    payload["filters"]["directions"] = list(condition.directions)
+    payload["filters"]["cities"] = list(condition.cities)
+    payload["filters"]["track"] = condition.track
+    return _with_nature(payload, items_key=None, companies_key="companies")
 
 
 @router.get("/events")
