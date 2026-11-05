@@ -99,6 +99,42 @@ def test_multiple_groups_are_unioned(patched):
     assert status["result"]["in_scope"] == 3
 
 
+def test_materials_group_filters_on_the_position_list(monkeypatch, tmp_path):
+    """勾「材料/新材料」只收材料岗，不是把化工/制造四个行业全收进来。"""
+
+    captured = {}
+
+    def fake_fetch(*, recruit_types, max_pages_per_type, logger=None, **kwargs):
+        return [
+            {**(_posting("energy-chemical-environment", "化工厂", "")), "positionsText": "材料研发工程师"},
+            {**(_posting("energy-chemical-environment", "化工厂", "")), "positionsText": "人力资源专员"},
+            {**(_posting("manufacturing-equipment", "机床厂", "")), "positionsText": "自动化工程师"},
+            {**(_posting("internet-tech", "互联网公司", "")), "positionsText": "材料工程师"},
+        ]
+
+    def fake_ingest(storage, postings, *, record_events=True, **kwargs):
+        captured["ingested"] = [row.get("companyName") for row in postings]
+        return SimpleNamespace(
+            to_dict=lambda: {
+                "run_id": "run-m",
+                "companies_written": len(postings),
+                "inserted": len(postings),
+                "updated": 0,
+            }
+        )
+
+    monkeypatch.setattr(manual_collect, "fetch_offerbiu_postings", fake_fetch)
+    monkeypatch.setattr(manual_collect, "ingest_offerbiu_postings", fake_ingest)
+
+    manual_collect.start_collection(
+        object(), industry_groups=["materials"], recruit_types=["秋招"]
+    )
+    status = _wait_for_result()
+    assert captured["ingested"] == ["化工厂"]
+    assert status["result"]["in_scope"] == 1
+    assert status["result"]["filtered_out"] == 3
+
+
 def test_days_flag_becomes_a_publish_cutoff(patched):
     manual_collect.start_collection(
         object(),

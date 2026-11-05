@@ -653,14 +653,19 @@ def watch_run(
 def intelligence_collect_status() -> dict[str, Any]:
     """Current manual-collection state plus the scope options for the UI."""
 
-    from packages.config import OFFERBIU_INDUSTRY_GROUP_OPTIONS
+    from packages.config import OFFERBIU_INDUSTRY_GROUP_HINTS, OFFERBIU_INDUSTRY_GROUP_OPTIONS
     from packages.intelligence.manual_collect import VALID_RECRUIT_TYPES, collection_status
 
     payload = collection_status()
     payload["options"] = {
         "selected_days": get_settings().offerbiu_collect_days,
         "industry_groups": [
-            {"code": code, "label": label} for code, label in OFFERBIU_INDUSTRY_GROUP_OPTIONS
+            {
+                "code": code,
+                "label": label,
+                "hint": OFFERBIU_INDUSTRY_GROUP_HINTS.get(code, ""),
+            }
+            for code, label in OFFERBIU_INDUSTRY_GROUP_OPTIONS
         ],
         "recruit_types": list(VALID_RECRUIT_TYPES),
         "selected_groups": list(get_settings().offerbiu_industry_groups),
@@ -694,6 +699,15 @@ def intelligence_collect(payload: dict[str, Any]) -> dict[str, Any]:
         ):
             raise HTTPException(status_code=422, detail="industry_groups 需要至少一个非空行业代码")
         groups = [value.strip() for value in raw_groups]
+        from packages.config import OFFERBIU_INDUSTRY_GROUP_OPTIONS
+
+        known = {code for code, _label in OFFERBIU_INDUSTRY_GROUP_OPTIONS}
+        unknown = sorted(set(groups) - known)
+        if unknown:
+            # 静默采回 0 条最难排查，直接说清楚哪个代码不存在。
+            raise HTTPException(
+                status_code=422, detail="未知的行业范围：" + "、".join(unknown)
+            )
     raw_types = body.get("recruit_types")
     if raw_types is None:
         recruit_types = ["实习", "秋招", "春招"]

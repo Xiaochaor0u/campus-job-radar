@@ -33,6 +33,9 @@ OFFERBIU_INDUSTRY_GROUP_OPTIONS = (
     ("manufacturing-equipment", "制造/装备/工业自动化"),
     ("auto-transport-equipment", "汽车/新能源车/交通设备"),
     ("energy-chemical-environment", "能源/电力/化工/环保"),
+    # 源站没有独立的「材料」分组，材料岗散在化工/制造/半导体/汽车四个组里，
+    # 所以这一项是组合组：先限这四个行业，再按岗位名筛材料相关词。
+    ("materials", "材料/新材料"),
     ("biotech-healthcare", "生物医药/医疗健康"),
     ("consumer-retail", "消费/零售/电商/快消"),
     ("construction-real-estate", "建筑地产/市政工程"),
@@ -44,6 +47,11 @@ OFFERBIU_INDUSTRY_GROUP_OPTIONS = (
 _OFFERBIU_INDUSTRY_GROUP_CODES = frozenset(
     code for code, _label in OFFERBIU_INDUSTRY_GROUP_OPTIONS
 )
+
+#: 勾选项的补充说明（没有说明的项不显示提示）。
+OFFERBIU_INDUSTRY_GROUP_HINTS = {
+    "materials": "在化工/制造/半导体/汽车四个行业里，再按岗位名筛出材料相关岗位；不是把这四个行业的全部岗位都收进来。",
+}
 
 
 def anonymous_profile_payload() -> dict[str, object]:

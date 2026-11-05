@@ -36,6 +36,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from packages.config import get_settings  # noqa: E402
+from packages.industry_scope import (  # noqa: E402
+    MATERIAL_KEYWORDS,
+    matches_industry_scope,
+)
 from packages.intelligence.offerbiu_source import (  # noqa: E402
     CST,
     OfferBiuError,
@@ -66,12 +70,9 @@ PRESETS: dict[str, dict[str, Any]] = {
     },
     "materials": {
         "label": "材料类",
-        "keywords": (
-            "材料", "高分子", "金属", "陶瓷", "复合", "冶金", "化工", "化学", "电池",
-            "新能源", "薄膜", "晶体", "粉末", "热处理", "焊接", "涂层", "纳米",
-            "力学", "表征", "封装", "电镀", "腐蚀", "烧结", "改性", "聚合", "纺丝",
-            "润滑", "摩擦学", "无机", "有机", "合金", "铸造", "锻造", "模具",
-        ),
+        # 与网页「材料/新材料」勾选项、scripts 的 --preset materials 共用同一份
+        # 关键词，三处口径永远一致。
+        "keywords": MATERIAL_KEYWORDS,
     },
 }
 
@@ -102,13 +103,6 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _industry_codes(item: dict[str, Any]) -> set[str]:
-    codes = item.get("industryGroupCodes")
-    if not isinstance(codes, list):
-        return set()
-    return {str(code) for code in codes}
-
-
 def _positions(item: dict[str, Any]) -> str:
     """Only the position list counts — company and industry add noise."""
 
@@ -127,7 +121,8 @@ def _match_reason(
         positions = _positions(item)
         if any(word.casefold() in positions for word in keywords):
             return "keyword"
-    if groups & _industry_codes(item):
+    # 普通分组比 industryGroupCodes；「材料/新材料」这类组合组还要看岗位名。
+    if groups and matches_industry_scope(item, groups):
         return "group"
     return ""
 

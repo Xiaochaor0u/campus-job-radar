@@ -6332,6 +6332,7 @@
     const groupBox = $("intel-collect-groups");
     if (!groupBox) return;
     groupBox.replaceChildren();
+    const hints = [];
     for (const group of options?.industry_groups || []) {
       const label = document.createElement("label");
       label.className = "intel-check";
@@ -6341,7 +6342,18 @@
       box.checked = (selectedGroups || []).includes(group.code);
       label.appendChild(box);
       label.appendChild(document.createTextNode(group.label));
+      if (group.hint) {
+        // 提示挂在勾选项上（悬停可看），同时收进下面那行小字，避免用户
+        // 以为「材料/新材料」会把化工/制造四个行业的岗位全收进来。
+        label.title = group.hint;
+        hints.push(`${group.label}：${group.hint}`);
+      }
       groupBox.appendChild(label);
+    }
+    const hintBox = $("intel-collect-group-hint");
+    if (hintBox) {
+      hintBox.textContent = hints.join(" ");
+      hintBox.hidden = !hints.length;
     }
     const dayBox = $("intel-collect-days");
     if (dayBox) {

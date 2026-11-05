@@ -5,6 +5,7 @@ from hashlib import sha256
 from typing import Any, Callable
 
 from packages.config import DEFAULT_OFFERBIU_INDUSTRY_GROUPS, OFFERBIU_INDUSTRY_GROUP_OPTIONS
+from packages.industry_scope import expand_industry_codes
 
 from .company_registry import CompanySourceRegistry
 from .oc_capture import classify_oc_destination_url
@@ -14,6 +15,13 @@ INDUSTRY_GROUPS = frozenset(DEFAULT_OFFERBIU_INDUSTRY_GROUPS)
 
 
 def selected_industry_groups(scope: Mapping[str, Any] | None = None) -> frozenset[str]:
+    """Selected groups, flattened to the codes the source itself knows.
+
+    Composite groups such as 「材料/新材料」 are not real source codes, so they
+    are expanded here; everything downstream (request parameters, snapshot
+    filters, row checks) then speaks the source's own vocabulary.
+    """
+
     if scope is None:
         return INDUSTRY_GROUPS
     values = scope.get("industry_groups")
@@ -21,7 +29,7 @@ def selected_industry_groups(scope: Mapping[str, Any] | None = None) -> frozense
     if (not isinstance(values, (list, tuple)) or not values
             or any(not isinstance(value, str) or value not in allowed for value in values)):
         raise ValueError("scope.industry_groups must contain supported industry codes")
-    return frozenset(values)
+    return frozenset(expand_industry_codes(values))
 
 
 def offerbiu_row_error(item: Any) -> str | None:

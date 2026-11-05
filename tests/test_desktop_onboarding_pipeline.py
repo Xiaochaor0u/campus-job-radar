@@ -12,6 +12,7 @@ from packages.candidate_profile import load_candidate_profile
 from packages.candidate_profile.context import build_scoring_context
 from packages.discovery.company_registry import CompanySourceRegistry
 from packages.discovery.offerbiu_refresh import OfferBiuRefreshService, capture_offerbiu_snapshot
+from packages.industry_scope import COMPOSITE_GROUPS, expand_industry_codes
 from packages.matching.client import DeepSeekClient, DeepSeekClientError
 from packages.matching.rules import profile_fingerprint
 from packages.matching.service import MatchingService
@@ -40,7 +41,11 @@ class Session:
         return type("Response", (), {"status_code": 200, "json": lambda self: payload})()
 
 
-@pytest.mark.parametrize("group", [code for code, _ in OFFERBIU_INDUSTRY_GROUP_OPTIONS])
+# 组合组（材料/新材料）不是源站代码，走下面单独的展开用例。
+@pytest.mark.parametrize(
+    "group",
+    [code for code, _ in OFFERBIU_INDUSTRY_GROUP_OPTIONS if code not in COMPOSITE_GROUPS],
+)
 def test_every_configured_industry_reaches_capture_and_registration(group):
     storage = Storage.from_url("sqlite:///:memory:", initialize=True)
     registry = CompanySourceRegistry(storage)
@@ -56,10 +61,31 @@ def test_every_configured_industry_reaches_capture_and_registration(group):
     assert registry.list_sources()["total"] == 2  # Preserve history, don't crawl it.
 
 
+def test_composite_group_is_sent_as_its_source_codes():
+    """勾「材料/新材料」时请求的是源站认识的四个代码，不是虚构的 materials。"""
+
+    storage = Storage.from_url("sqlite:///:memory:", initialize=True)
+    registry = CompanySourceRegistry(storage)
+    codes = expand_industry_codes(["materials"])
+    service = OfferBiuRefreshService(
+        registry, session=Session(codes), scope={"industry_groups": ["materials"]}
+    )
+    result = service.refresh(delay_seconds=0)
+    assert result["complete"]
+    assert result["registered_entries"] == len(codes)
+    # 服务把组合组展开成源站代码后再发请求，scope 里存的就是展开结果。
+    assert service.scope["industry_groups"] == sorted(codes)
+    assert {row["company_name"] for row in result["pending_entries"]} == {
+        f"Synthetic {code}" for code in codes
+    }
+
+
 def test_all_industries_trust_selected_source_scope_not_stale_row_labels():
     groups = [code for code, _ in OFFERBIU_INDUSTRY_GROUP_OPTIONS]
-    result = capture_offerbiu_snapshot(session=Session(groups), scope={"industry_groups": groups})
-    assert result["complete"] and len(result["items"]) == len(groups)
+    # 组合组会展开成源站代码，请求参数因此是展开后的列表。
+    wire = list(expand_industry_codes(groups))
+    result = capture_offerbiu_snapshot(session=Session(wire), scope={"industry_groups": groups})
+    assert result["complete"] and len(result["items"]) == len(wire)
     result = capture_offerbiu_snapshot(session=Session(["finance"], "internet-tech"),
                                       scope={"industry_groups": ["finance"]})
     assert result["complete"] and result["scope_verified"]

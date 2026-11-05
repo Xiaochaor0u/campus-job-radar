@@ -138,3 +138,45 @@ def test_push_preview_renders_without_sending(client: TestClient) -> None:
     payload = response.json()
     assert "岗位情报日报" in payload["plain_message"]
     assert payload["webhook_count"] == 0
+
+
+def test_collect_status_offers_the_materials_scope(client: TestClient) -> None:
+    response = client.get("/api/intelligence/collect/status")
+    assert response.status_code == 200
+    options = response.json()["options"]
+    materials = [row for row in options["industry_groups"] if row["code"] == "materials"]
+    assert materials, "材料/新材料 必须出现在采集范围里"
+    # 细筛项要带说明，否则用户以为勾了就把四个行业全收进来
+    assert materials[0]["hint"]
+
+
+def test_collect_rejects_an_unknown_industry_code(client: TestClient) -> None:
+    """静默采回 0 条最难排查，未知代码必须当场报错。"""
+
+    response = client.post(
+        "/api/intelligence/collect",
+        json={"industry_groups": ["no-such-group"], "recruit_types": ["秋招"], "days": 1},
+    )
+    assert response.status_code == 422
+    assert "no-such-group" in response.json()["detail"]
+
+
+def test_collect_status_offers_the_materials_scope(client: TestClient) -> None:
+    response = client.get("/api/intelligence/collect/status")
+    assert response.status_code == 200
+    options = response.json()["options"]
+    materials = [row for row in options["industry_groups"] if row["code"] == "materials"]
+    assert materials, "材料/新材料 必须出现在采集范围里"
+    # 细筛项要带说明，否则用户以为勾了就把四个行业全收进来
+    assert materials[0]["hint"]
+
+
+def test_collect_rejects_an_unknown_industry_code(client: TestClient) -> None:
+    """静默采回 0 条最难排查，未知代码必须当场报错。"""
+
+    response = client.post(
+        "/api/intelligence/collect",
+        json={"industry_groups": ["no-such-group"], "recruit_types": ["秋招"], "days": 1},
+    )
+    assert response.status_code == 422
+    assert "no-such-group" in response.json()["detail"]

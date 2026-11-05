@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from packages.industry_scope import matches_industry_scope
 from packages.intelligence.offerbiu_source import (
     CST,
     fetch_offerbiu_postings,
@@ -178,13 +179,9 @@ class _Collector:
                 logger=self._progress,
             )
             fetched = len(postings)
-            wanted = set(groups)
-            scoped = [
-                item
-                for item in postings
-                if isinstance(item.get("industryGroupCodes"), list)
-                and any(code in wanted for code in item["industryGroupCodes"])
-            ]
+            # 普通分组按 industryGroupCodes 命中；「材料/新材料」是组合组，
+            # 还要再看岗位名——四个相关行业里的 HR、财务不算材料岗。
+            scoped = [item for item in postings if matches_industry_scope(item, groups)]
             self._update(
                 phase="ingesting",
                 progress={
