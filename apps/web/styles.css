@@ -5882,6 +5882,9 @@ a.intelligence-title:hover { color: var(--accent-dark); text-decoration: underli
 .company-nature--国资 { color: #7d2f38; border-color: #eccfd3; background: #fdeff1; }
 .company-nature--外资 { color: #4a3a7a; border-color: #d8d0ea; background: #f3f0fa; }
 .company-nature--合资 { color: #7a4a12; border-color: #ecd7b4; background: #fbf1e2; }
+/* 岗位名可能是几十个方向拼成的一长串，限四行；完整内容在 title 里 */
+.intel-jobs-table td:nth-child(2) { max-height: 96px; }
+.intel-jobs-table td:nth-child(2) a { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 /* 员工规模：和性质标签并排，但用虚线边框区分"来自年报的数字"和"性质标签" */
 .company-size { display: inline-flex; align-items: center; margin-left: 6px; padding: 0 6px; border-radius: 4px; font-size: 11px; line-height: 16px; border: 1px dashed var(--line-strong); color: var(--ink-soft); background: var(--surface); vertical-align: middle; cursor: help; }
 .collect-panel { margin: 0 0 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-subtle); }

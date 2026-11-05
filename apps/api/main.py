@@ -462,8 +462,11 @@ async def local_ui_boundary(request, call_next):
         if request.url.path in {
             "/", "/index.html", "/app.js", "/company-sources.js", "/configuration.js", "/styles.css"
         }:
-            # Revalidate HTML and its mutable assets together after deployment.
-            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            # 本地工具没有 CDN，也不该让浏览器留着旧索引。no-cache 只要求
+            # 重新验证，某些情况下仍会复用磁盘副本；直接 no-store 才能保证
+            # 「改完刷新就看到」，不用教用户按 Ctrl+F5。
+            response.headers["Cache-Control"] = "no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
         return response
     finally:
         local_ui_request.reset(token)

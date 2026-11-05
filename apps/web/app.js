@@ -6693,8 +6693,9 @@
     return group;
   }
 
-  // 「全部岗位」「智能推荐」暂时下线：DOM 与接口都保留，恢复时把 key 加回来即可。
-  const INTEL_ENABLED_TABS = new Set(["changes"]);
+  // 「智能推荐」暂时下线：DOM 与接口都保留，恢复时把 key 加回来即可。
+  // 「全部岗位」是独立页面，不并入「岗位变化」。
+  const INTEL_ENABLED_TABS = new Set(["changes", "all"]);
 
   const WATCH_WINDOW_HOURS = { "3d": 72, "7d": 168, "30d": 720 };
   const WATCH_WINDOW_LABELS = { today: "今天", "3d": "最近 3 天", "7d": "最近 7 天", "30d": "最近 30 天" };
@@ -6912,6 +6913,16 @@
     return button;
   }
 
+  // 公告常把几十个城市塞进地点字段（"北京、天津、石家庄…"），整列被撑成一屏高。
+  // 只显示前三个，其余用"等 N 地"折叠，完整内容放 title。
+  function intelCityLabel(city) {
+    const raw = String(city || "").trim();
+    if (!raw) return "";
+    const parts = raw.split(/[、,，\/]/).map((part) => part.trim()).filter(Boolean);
+    if (parts.length <= 3) return raw;
+    return `${parts.slice(0, 3).join("、")} 等 ${parts.length} 地`;
+  }
+
   function renderIntelJobRow(item) {
     const row = document.createElement("tr");
 
@@ -6941,7 +6952,8 @@
     row.appendChild(titleCell);
 
     const cityCell = document.createElement("td");
-    cityCell.textContent = text(item.city);
+    cityCell.textContent = intelCityLabel(item.city);
+    if (item.city) cityCell.title = String(item.city);
     row.appendChild(cityCell);
 
     const trackCell = document.createElement("td");
@@ -7401,6 +7413,7 @@
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-selected", active ? "true" : "false");
     });
+    if (tab === "all" && !intelJobsLoaded) void loadIntelligenceJobs(1);
     // The sidebar keeps two entries into this view; sync their highlight.
     document.querySelectorAll("[data-intel-nav-tab]").forEach((item) => {
       item.classList.toggle("is-active", activeView === "intelligence" && item.dataset.intelNavTab === tab);
